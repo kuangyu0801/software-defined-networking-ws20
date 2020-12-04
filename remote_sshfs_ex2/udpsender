@@ -1,0 +1,16 @@
+#!/bin/bash
+
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+function usage {
+    echo "Usage: $0 <host> <port> <num>"
+    echo "       Sends <num> datagrams containing sequence"
+    echo "       numbers to <host>:<port> (10 per second)"
+    exit 1
+}
+
+[[ $# -ne 3 ]] && usage
+
+echo -n "Sending ${3}0 datagrams to $1:$2 ... "
+
+${SCRIPTDIR}/lib/senddatagrams $1 $2 ${3}0 10 100 && echo "done"
