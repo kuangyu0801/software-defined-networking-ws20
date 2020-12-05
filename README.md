@@ -5,7 +5,12 @@
 ## Task2.1
 h1, h2都收不到udp packet
 - 可能方向是從udp deliver去查找
-- 使用default forwarding也沒有辦法ping成功
+
+實驗1:使用default forwarding也沒有辦法ping成功 
+- 可能原因, 兩個屬於不同網段(搜尋：同个网段和不同网段的ping过程)
+- 檢查arp table
+http://linux.vbird.org/linux_server/0230router.php
+
 
 # Task 3
 
