@@ -2,6 +2,11 @@
 
 # Task 2
 
+## Task2.1
+h1, h2都收不到udp packet
+- 可能方向是從udp deliver去查找
+- 使用default forwarding也沒有辦法ping成功
+
 # Task 3
 
 
