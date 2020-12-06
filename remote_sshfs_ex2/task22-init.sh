@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#TODO
+#DONE
 
 #s2
 curl -X POST -d '{"switch":"00:00:00:00:00:00:00:02", "name":"s2-src-sink-init", "priority":"1", "eth_type":"0x0800", "ipv4_dst":"10.0.0.10", "active":"true", "actions":"output=2"}' http://localhost:8080/wm/staticentrypusher/json
