@@ -24,11 +24,16 @@ Per-packet Consistency
 
 # Task 3
 
+- https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/1343513/How+to+Write+a+Module
+- https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/9142279/How+to+Process+a+Packet-In+Message
+- https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/9142281/How+to+Create+a+Packet+Out+Message
+- 1. controller設hardtimeout, 時間一到把所有包從s1轉給自己, 然後再install到s8上面
 
-# 
+直接看特定switch json
 
+```
 curl http://<controller_ip>:8080/wm/staticentrypusher/list/00:00:00:00:00:00:00:01/json
-
+```
 
 # 知識點釐清
 - ARP請求會不會對全外網進行廣播

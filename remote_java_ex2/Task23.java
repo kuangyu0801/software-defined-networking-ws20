@@ -18,8 +18,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 
 	@Override
 	public String getName() {
-		// TODO Auto-generated method stub
-		return null;
+		// DONE Auto-generated method stub
+		return this.class.getSimpleName();
 	}
 
 	@Override
@@ -54,20 +54,26 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleDependencies() {
-		// TODO Auto-generated method stub
-		return null;
+		// DONE Auto-generated method stub
+		Collection<Class<? extends IFloodlightService>> l =
+				new ArrayList<Class<? extends IFloodlightService>>();
+		l.add(IFloodlightProviderService.class);
+		return l;
 	}
 
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
-		// TODO Auto-generated method stub
+		// DONE Auto-generated method stub
+		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
+		macAddresses = new ConcurrentSkipListSet<Long>();
+		logger = LoggerFactory.getLogger(this.class);
 
 	}
 
 	@Override
 	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-		// TODO Auto-generated method stub
-
+		// DONE Auto-generated method stub
+		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
 	}
 
 }
