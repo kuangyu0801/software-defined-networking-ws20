@@ -25,6 +25,10 @@ Per-packet Consistency
 # Task 3
 
 
+# 
+
+curl http://<controller_ip>:8080/wm/staticentrypusher/list/00:00:00:00:00:00:00:01/json
+
 
 # 知識點釐清
 - ARP請求會不會對全外網進行廣播
