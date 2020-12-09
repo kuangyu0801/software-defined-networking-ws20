@@ -27,7 +27,10 @@ Per-packet Consistency
 - https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/1343513/How+to+Write+a+Module
 - https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/9142279/How+to+Process+a+Packet-In+Message
 - https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/9142281/How+to+Create+a+Packet+Out+Message
+- [Switch Flow Table Configuration](https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/9142325/Switch+Flow+Table+Configuration)
+- [Floodlight Javadoc](http://floodlight.github.io/floodlight/javadoc/floodlight/index.html)
 - 1. controller設hardtimeout, 時間一到把所有包從s1轉給自己, 然後再install到s8上面
+- // where does log comes from and how to generate log
 
 直接看特定switch json
 
@@ -38,12 +41,19 @@ curl http://<controller_ip>:8080/wm/staticentrypusher/list/00:00:00:00:00:00:00:
 # 知識點釐清
 - ARP請求會不會對全外網進行廣播
 
-
+# Nice to Have
+- Java logger https://www.journaldev.com/977/logger-in-java-logging-example
 ```
 ssh sdnfp04_proxy
 
 sshfs sdnfp04_proxy:/home/student/ex2 remote_sshfs_ex2
 sshfs sdnfp04_proxy:/opt/floodlight/src/main/java/net/sdnlab/ex2 remote_java_ex2
+sshfs sdnfp04_proxy:/opt/floodlight/src/main/resources/META-INF/services remote_meta_ex2
 
 /opt/floodlight/floodlight-noforwarding.sh
+dpctl dump-flows
 ```
+
+[]: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/9142325/Switch+Flow+Table+Configuration
+
+[]: http://floodlight.github.io/floodlight/javadoc/floodlight/index.html
