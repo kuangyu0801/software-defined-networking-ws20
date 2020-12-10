@@ -23,8 +23,11 @@ import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.protocol.oxm.OFOxms;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.EthType;
+import org.projectfloodlight.openflow.types.IpProtocol;
 import org.projectfloodlight.openflow.types.OFPort;
 import org.projectfloodlight.openflow.types.OFVlanVidMatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -36,14 +39,17 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPv4;
 
 public class Task23 implements IFloodlightModule, IOFMessageListener {
 	// Since we are listening to OpenFlow messages we need to register with the FloodlightProvider (IFloodlightProviderService class)
 	protected IFloodlightProviderService floodlightProvider; 
 	protected IOFSwitchService switchService;
-	// TODO: add back the logger
+	// TODO: export logger
+	// DONE: add back the logger
 	// Finally, we need a logger to output what we've seen.
-	//protected static Logger logger;
+	protected static Logger logger;
+	protected boolean UPDATE = false;
 
 
 	// put in an ID for our OFMessage listener
@@ -69,18 +75,26 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		// TODO Auto-generated method stub
 		switch(msg.getType()) {
-			case PACKET_IN:
-				withUpdate();
-				//send packet_out message out on port 1 of s8
+			case PACKET_IN:	
+//				logger.info("PACKET_IN message sent by switch: {}, getClass: {}"
+//						,sw.getId().toString(),msg.getClass());
 				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-				byte[] serializedData = eth.serialize();
-				IOFSwitch s8 = switchService.getSwitch(DatapathId.of(8));
-				OFPacketOut po = s8.getOFFactory().buildPacketOut()
-						.setData(serializedData)
-						.setActions(Collections.singletonList((OFAction) s8.getOFFactory().actions().output(OFPort.of(1),0xffFFffFF)))
-						.setInPort(OFPort.CONTROLLER)
-						.build();
-				s8.write(po);
+				if (eth.getEtherType() == EthType.IPv4) {
+					IPv4 ipv4 = (IPv4) eth.getPayload();
+					if (ipv4.getProtocol() == IpProtocol.UDP) {						
+						logger.info("PACKET_IN message sent by switch: {}, IpProtocol:UDP"
+								,sw.getId().toString());
+						
+						processPacketOutMessage(eth);
+						
+						if (UPDATE==false) {
+							withoutUpdate();
+							UPDATE=true;
+						}else {
+							withUpdate();
+						}						
+					}
+				}
 				break;
 			default:
 				break;
@@ -88,13 +102,26 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 		}
 		return Command.CONTINUE;
 	}
+	public void processPacketOutMessage(Ethernet eth){
+		//send packet_out message out on port 1 of s8
+		byte[] serializedData = eth.serialize();
+		IOFSwitch s8 = switchService.getSwitch(DatapathId.of(8));
+		OFPacketOut po = s8.getOFFactory().buildPacketOut()
+				.setData(serializedData)
+				.setActions(Collections.singletonList((OFAction) s8.getOFFactory().actions().output(OFPort.of(1),0xffFFffFF)))
+				.setInPort(OFPort.CONTROLLER)
+				.build();
+		s8.write(po);
+	}
 	
 	public void withoutUpdate(){
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
 		
-		//s1
+		//S1
 		Match myMatch_s1 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
 		ArrayList<OFAction> myActionList_s1 = new ArrayList<OFAction>();
@@ -112,9 +139,12 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 				.setActions(myActionList_s1)
 				.build();
 		switchService.getSwitch(DatapathId.of(1)).write(flowAdd_s1);
+
 		//s3
 		Match myMatch_s3 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
 		ArrayList<OFAction> myActionList_s3 = new ArrayList<OFAction>();
@@ -126,13 +156,17 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 
 		OFFlowAdd flowAdd_s3 = myFactory.buildFlowAdd()
 				.setPriority(1)
+				.setHardTimeout(10)
 				.setMatch(myMatch_s3)
 				.setActions(myActionList_s3)
 				.build();
 		switchService.getSwitch(DatapathId.of(3)).write(flowAdd_s3);
+
 		//s4
 		Match myMatch_s4 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(2))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
 		ArrayList<OFAction> myActionList_s4 = new ArrayList<OFAction>();
@@ -144,13 +178,17 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 
 		OFFlowAdd flowAdd_s4 = myFactory.buildFlowAdd()
 				.setPriority(1)
+				.setHardTimeout(10)
 				.setMatch(myMatch_s4)
 				.setActions(myActionList_s4)
 				.build();
 		switchService.getSwitch(DatapathId.of(4)).write(flowAdd_s4);
-		//s7
+
+		//	S7 in:1, out 3
 		Match myMatch_s7 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
 		ArrayList<OFAction> myActionList_s7 = new ArrayList<OFAction>();
@@ -162,13 +200,17 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 
 		OFFlowAdd flowAdd_s7 = myFactory.buildFlowAdd()
 				.setPriority(1)
+				.setHardTimeout(10)
 				.setMatch(myMatch_s7)
 				.setActions(myActionList_s7)
 				.build();
 		switchService.getSwitch(DatapathId.of(7)).write(flowAdd_s7);
-		//s8
+
+		//S8 in:3 , out: 1
 		Match myMatch_s8 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(3))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
 		ArrayList<OFAction> myActionList_s8 = new ArrayList<OFAction>();
@@ -180,6 +222,7 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 
 		OFFlowAdd flowAdd_s8 = myFactory.buildFlowAdd()
 				.setPriority(1)
+				.setHardTimeout(10)
 				.setMatch(myMatch_s8)
 				.setActions(myActionList_s8)
 				.build();
@@ -192,6 +235,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
 		Match myMatch_s1 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
 		ArrayList<OFAction> myActionList_s1 = new ArrayList<OFAction>();
@@ -220,6 +265,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 		//s2
 		Match myMatch_s2 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
 				.build();
 
@@ -239,6 +286,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 		//s4
 		Match myMatch_s4 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
 				.build();
 
@@ -258,6 +307,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 		//s6
 		Match myMatch_s6 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
 				.build();
 
@@ -277,6 +328,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 		//s8
 		Match myMatch_s8 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(2))
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
 				.build();
 
@@ -327,8 +380,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 		// DONE Auto-generated method stub
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
-		// TODO: enable logger
-		// logger = LoggerFactory.getLogger(this.class);
+		// DONE: enable logger
+		logger = LoggerFactory.getLogger(Task23.class);
 
 	}
 
