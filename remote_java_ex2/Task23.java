@@ -75,22 +75,19 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		// TODO Auto-generated method stub
 		switch(msg.getType()) {
-			case PACKET_IN:	
-//				logger.info("PACKET_IN message sent by switch: {}, getClass: {}"
-//						,sw.getId().toString(),msg.getClass());
+			case PACKET_IN:
 				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 				if (eth.getEtherType() == EthType.IPv4) {
 					IPv4 ipv4 = (IPv4) eth.getPayload();
 					if (ipv4.getProtocol() == IpProtocol.UDP) {						
 						logger.info("PACKET_IN message sent by switch: {}, IpProtocol:UDP"
-								,sw.getId().toString());
-						
+								, sw.getId().toString());
 						processPacketOutMessage(eth);
 						
-						if (UPDATE==false) {
+						if (UPDATE == false) {
 							withoutUpdate();
-							UPDATE=true;
-						}else {
+							UPDATE = true;
+						} else {
 							withUpdate();
 						}						
 					}
@@ -115,241 +112,167 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 	}
 	
 	public void withoutUpdate(){
+		// the current worable version is 1.4
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
-		
-		//S1
-		Match myMatch_s1 = myFactory.buildMatch()
+
+		// Matching
+		// Input matching for port-1, -2, -3
+		Match matchPort1 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
-		ArrayList<OFAction> myActionList_s1 = new ArrayList<OFAction>();
-		OFActions actions = myFactory.actions();
-		OFActionOutput output_s1 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(3))
-				.build();
-		myActionList_s1.add(output_s1);
-
-		OFFlowAdd flowAdd_s1 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setHardTimeout(10)
-				.setMatch(myMatch_s1)
-				.setActions(myActionList_s1)
-				.build();
-		switchService.getSwitch(DatapathId.of(1)).write(flowAdd_s1);
-
-		//s3
-		Match myMatch_s3 = myFactory.buildMatch()
-				.setExact(MatchField.IN_PORT, OFPort.of(1))
-				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
-				.build();
-
-		ArrayList<OFAction> myActionList_s3 = new ArrayList<OFAction>();
-		OFActionOutput output_s3 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(2))
-				.build();
-		myActionList_s3.add(output_s3);
-
-		OFFlowAdd flowAdd_s3 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setHardTimeout(10)
-				.setMatch(myMatch_s3)
-				.setActions(myActionList_s3)
-				.build();
-		switchService.getSwitch(DatapathId.of(3)).write(flowAdd_s3);
-
-		//s4
-		Match myMatch_s4 = myFactory.buildMatch()
+		Match matchPort2 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(2))
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
-		ArrayList<OFAction> myActionList_s4 = new ArrayList<OFAction>();
-		OFActionOutput output_s4 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(4))
-				.build();
-		myActionList_s4.add(output_s4);
-
-		OFFlowAdd flowAdd_s4 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setHardTimeout(10)
-				.setMatch(myMatch_s4)
-				.setActions(myActionList_s4)
-				.build();
-		switchService.getSwitch(DatapathId.of(4)).write(flowAdd_s4);
-
-		//	S7 in:1, out 3
-		Match myMatch_s7 = myFactory.buildMatch()
-				.setExact(MatchField.IN_PORT, OFPort.of(1))
-				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
-				.build();
-
-		ArrayList<OFAction> myActionList_s7 = new ArrayList<OFAction>();
-		OFActionOutput output_s7 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(3))
-				.build();
-		myActionList_s7.add(output_s7);
-
-		OFFlowAdd flowAdd_s7 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setHardTimeout(10)
-				.setMatch(myMatch_s7)
-				.setActions(myActionList_s7)
-				.build();
-		switchService.getSwitch(DatapathId.of(7)).write(flowAdd_s7);
-
-		//S8 in:3 , out: 1
-		Match myMatch_s8 = myFactory.buildMatch()
+		Match matchPort3 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(3))
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
-		ArrayList<OFAction> myActionList_s8 = new ArrayList<OFAction>();
-		OFActionOutput output_s8 = actions.buildOutput()
+		// Action & Output
+		// action matching for port-1 , -2 ,-3, -4
+		ArrayList<OFAction> actionListOutPort1 = new ArrayList<OFAction>();
+		OFActions actions = myFactory.actions();
+		OFActionOutput outputPort1 = actions.buildOutput()
 				.setMaxLen(0xFFffFFff)
 				.setPort(OFPort.of(1))
 				.build();
-		myActionList_s8.add(output_s8);
+		actionListOutPort1.add(outputPort1);
 
-		OFFlowAdd flowAdd_s8 = myFactory.buildFlowAdd()
+		ArrayList<OFAction> actionListOutPort2 = new ArrayList<OFAction>();
+		OFActionOutput outputPort2 = actions.buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(OFPort.of(2))
+				.build();
+		actionListOutPort2.add(outputPort2);
+
+		ArrayList<OFAction> actionListOutPort3 = new ArrayList<OFAction>();
+		OFActionOutput outputPort3 = actions.buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(OFPort.of(3))
+				.build();
+		actionListOutPort3.add(outputPort3);
+
+		ArrayList<OFAction> actionListOutPort4 = new ArrayList<OFAction>();
+		OFActionOutput outputPort4 = actions.buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(OFPort.of(4))
+				.build();
+		actionListOutPort4.add(outputPort4);
+
+		// FlowAdd, with 10 time out
+		OFFlowAdd flowAddPort1ToPort2 = myFactory.buildFlowAdd()
 				.setPriority(1)
 				.setHardTimeout(10)
-				.setMatch(myMatch_s8)
-				.setActions(myActionList_s8)
+				.setMatch(matchPort1)
+				.setActions(actionListOutPort2)
 				.build();
-		switchService.getSwitch(DatapathId.of(8)).write(flowAdd_s8);
+
+		OFFlowAdd flowAddPort1ToPort3 = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setHardTimeout(10)
+				.setMatch(matchPort1)
+				.setActions(actionListOutPort3)
+				.build();
+
+		OFFlowAdd flowAddPort3ToPort1 = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setHardTimeout(10)
+				.setMatch(matchPort3)
+				.setActions(actionListOutPort1)
+				.build();
+
+		OFFlowAdd flowAddPort2ToPort4 = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setHardTimeout(10)
+				.setMatch(matchPort2)
+				.setActions(actionListOutPort4)
+				.build();
+
+		// Set Switch
+		// S1: port-1 to port-3
+		switchService.getSwitch(DatapathId.of(1)).write(flowAddPort1ToPort3);
+		switchService.getSwitch(DatapathId.of(3)).write(flowAddPort1ToPort2);
+		switchService.getSwitch(DatapathId.of(4)).write(flowAddPort2ToPort4);
+		switchService.getSwitch(DatapathId.of(7)).write(flowAddPort1ToPort3);
+		switchService.getSwitch(DatapathId.of(8)).write(flowAddPort3ToPort1);
 
 	}
 	
 	public void withUpdate(){
-		//s1
+		// the current worable version is 1.4
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
-		Match myMatch_s1 = myFactory.buildMatch()
+
+		// Matching
+		// Input matching for port-1, -2
+		Match matchPort1 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(1))
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 				.build();
 
-		ArrayList<OFAction> myActionList_s1 = new ArrayList<OFAction>();
-		OFActions actions = myFactory.actions();
-		OFActionPushVlan pushVlan = actions.pushVlan(EthType.of(0x8100));
-		myActionList_s1.add(pushVlan);
-
-		OFOxms oxms = myFactory.oxms();
-		OFActionSetField vlanid = actions.buildSetField()
-				.setField(oxms.buildVlanVid().setValue(OFVlanVidMatch.ofVlan(10)).build())
-				.build();
-		myActionList_s1.add(vlanid);
-
-		OFActionOutput output_s1 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(2))
-				.build();
-		myActionList_s1.add(output_s1);
-
-		OFFlowAdd flowAdd_s1 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setMatch(myMatch_s1)
-				.setActions(myActionList_s1)
-				.build();
-		switchService.getSwitch(DatapathId.of(1)).write(flowAdd_s1);
-		//s2
-		Match myMatch_s2 = myFactory.buildMatch()
-				.setExact(MatchField.IN_PORT, OFPort.of(1))
-				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
-				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
-				.build();
-
-		ArrayList<OFAction> myActionList_s2 = new ArrayList<OFAction>();
-		OFActionOutput output_s2 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(2))
-				.build();
-		myActionList_s2.add(output_s2);
-
-		OFFlowAdd flowAdd_s2 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setMatch(myMatch_s2)
-				.setActions(myActionList_s2)
-				.build();
-		switchService.getSwitch(DatapathId.of(2)).write(flowAdd_s2);
-		//s4
-		Match myMatch_s4 = myFactory.buildMatch()
-				.setExact(MatchField.IN_PORT, OFPort.of(1))
-				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
-				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
-				.build();
-
-		ArrayList<OFAction> myActionList_s4 = new ArrayList<OFAction>();
-		OFActionOutput output_s4 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(3))
-				.build();
-		myActionList_s4.add(output_s4);
-
-		OFFlowAdd flowAdd_s4 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setMatch(myMatch_s4)
-				.setActions(myActionList_s4)
-				.build();
-		switchService.getSwitch(DatapathId.of(4)).write(flowAdd_s4);
-		//s6
-		Match myMatch_s6 = myFactory.buildMatch()
-				.setExact(MatchField.IN_PORT, OFPort.of(1))
-				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
-				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
-				.build();
-
-		ArrayList<OFAction> myActionList_s6 = new ArrayList<OFAction>();
-		OFActionOutput output_s6 = actions.buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(OFPort.of(3))
-				.build();
-		myActionList_s6.add(output_s6);
-
-		OFFlowAdd flowAdd_s6 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setMatch(myMatch_s6)
-				.setActions(myActionList_s6)
-				.build();
-		switchService.getSwitch(DatapathId.of(6)).write(flowAdd_s6);
-		//s8
-		Match myMatch_s8 = myFactory.buildMatch()
+		Match matchPort2 = myFactory.buildMatch()
 				.setExact(MatchField.IN_PORT, OFPort.of(2))
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
-				.setExact(MatchField.VLAN_VID, OFVlanVidMatch.ofVlan(10))
 				.build();
 
-		ArrayList<OFAction> myActionList_s8 = new ArrayList<OFAction>();
-		OFActionPopVlan popVlan = actions.popVlan();
-		myActionList_s8.add(popVlan);
-
-		OFActionOutput output_s8 = actions.buildOutput()
+		// Action & Output
+		// action matching for port-1 , -2 ,-3
+		ArrayList<OFAction> actionListOutPort1 = new ArrayList<OFAction>();
+		OFActions actions = myFactory.actions();
+		OFActionOutput outputPort1 = actions.buildOutput()
 				.setMaxLen(0xFFffFFff)
 				.setPort(OFPort.of(1))
 				.build();
-		myActionList_s8.add(output_s8);
+		actionListOutPort1.add(outputPort1);
 
-		OFFlowAdd flowAdd_s8 = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setMatch(myMatch_s8)
-				.setActions(myActionList_s8)
+		ArrayList<OFAction> actionListOutPort2 = new ArrayList<OFAction>();
+		OFActionOutput outputPort2 = actions.buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(OFPort.of(2))
 				.build();
-		switchService.getSwitch(DatapathId.of(8)).write(flowAdd_s8);
+		actionListOutPort2.add(outputPort2);
 
+		ArrayList<OFAction> actionListOutPort3 = new ArrayList<OFAction>();
+		OFActionOutput outputPort3 = actions.buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(OFPort.of(3))
+				.build();
+		actionListOutPort3.add(outputPort3);
+
+		// FlowAdd without timeout
+		OFFlowAdd flowAddPort1ToPort2 = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setMatch(matchPort1)
+				.setActions(actionListOutPort2)
+				.build();
+
+		OFFlowAdd flowAddPort1ToPort3 = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setMatch(matchPort1)
+				.setActions(actionListOutPort3)
+				.build();
+
+		OFFlowAdd flowAddPort2ToPort1 = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setMatch(matchPort2)
+				.setActions(actionListOutPort1)
+				.build();
+
+		// Set Switch
+		// S1: port-1 to port-3
+		switchService.getSwitch(DatapathId.of(1)).write(flowAddPort1ToPort2);
+		switchService.getSwitch(DatapathId.of(2)).write(flowAddPort1ToPort2);
+		switchService.getSwitch(DatapathId.of(4)).write(flowAddPort1ToPort3);
+		switchService.getSwitch(DatapathId.of(6)).write(flowAddPort1ToPort3);
+		switchService.getSwitch(DatapathId.of(8)).write(flowAddPort2ToPort1);
 	}
 
 
