@@ -49,7 +49,8 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 	// DONE: add back the logger
 	// Finally, we need a logger to output what we've seen.
 	protected static Logger logger;
-	protected boolean UPDATE = false;
+	private boolean UPDATE = false;
+	private boolean INIT = false;
 
 
 	// put in an ID for our OFMessage listener
@@ -84,11 +85,12 @@ public class Task23 implements IFloodlightModule, IOFMessageListener {
 								, sw.getId().toString());
 						processPacketOutMessage(eth);
 						
-						if (UPDATE == false) {
+						if (!INIT) {
 							withoutUpdate();
-							UPDATE = true;
-						} else {
+							INIT = true;
+						} else if (!UPDATE && INIT){
 							withUpdate();
+							UPDATE = true;
 						}						
 					}
 				}
