@@ -30,9 +30,15 @@ Per-packet Consistency
 - [Switch Flow Table Configuration](https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/9142325/Switch+Flow+Table+Configuration)
 - [Floodlight Javadoc](http://floodlight.github.io/floodlight/javadoc/floodlight/index.html)
 - 1. controller設hardtimeout, 時間一到把所有包從s1轉給自己, 然後再install到s8上面
-- // where does log comes from and how to generate log
-
+- // where does log comes from and how to generate log 
+// logger
+// consistent state transition
+// should we used vlan tagging
+// dynamic monitoring
 直接看特定switch json
+# TODO
+- log島出來
+- 實驗試試看thread.sleep
 
 ```
 curl http://<controller_ip>:8080/wm/staticentrypusher/list/00:00:00:00:00:00:00:01/json
@@ -43,6 +49,7 @@ curl http://<controller_ip>:8080/wm/staticentrypusher/list/00:00:00:00:00:00:00:
 
 # Nice to Have
 - Java logger https://www.journaldev.com/977/logger-in-java-logging-example
+- Why .sh is not working...
 ```
 ssh sdnfp04_proxy
 
