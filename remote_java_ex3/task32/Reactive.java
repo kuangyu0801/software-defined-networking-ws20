@@ -1,15 +1,17 @@
 package net.sdnlab.ex3.task32;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.FileHandler;
+import java.util.logging.Logger;
 
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.types.DatapathId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -32,7 +34,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	private Set<DatapathId> setDatapathId;
 
 	// TODO: export logger output into log file
-	protected static Logger logger;
+	private static final Logger logger = Logger.getLogger(Reactive.class.getSimpleName());
+	// static 
 	@Override
 	public String getName() {
 		// DONE Auto-generated method stub
@@ -77,16 +80,23 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		l.add(IFloodlightProviderService.class);
 		return l;
 	}
-
+	
+	private void setupLogger() {
+		try {
+			FileHandler fileHandler = new FileHandler("/home/student/ex3/task32.log");
+			logger.addHandler(fileHandler);
+		} catch (Exception e) {
+	        System.out.println("Failed to configure logging to file");
+	    }
+	}
+	
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
 		// DONE Auto-generated method stub
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		linkDiscoverer = context.getServiceImpl(ILinkDiscoveryService.class);
-		
-		//
-		logger = LoggerFactory.getLogger(Reactive.class);
+		setupLogger();
 		logger.info("Init");
 	}
 
@@ -105,8 +115,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		for (DatapathId dpid: setDatapathId) {
 			logger.info(dpid.toString());
 		}
+		logger.info("Total switch number:" + setDatapathId.size());
 		Map<Link, LinkInfo> links = linkDiscoverer.getLinks();
-		logger.info(null, links.size());
 		logger.info("Get all links");
 		// TODO: remove this method to a more steady state
 		for (Link link : links.keySet()) {

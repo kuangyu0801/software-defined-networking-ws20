@@ -37,7 +37,11 @@ sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/fattree.py --
 # 3.3 – Adaptive Link Load Balancing
 
 # Frequently Used Command
-
+- 改用java native library 
+    + https://codebeautify.org/
+- Java程序员修炼之道 之 Logging(2/3) - 怎么写Log https://blog.csdn.net/justfly/article/details/38525335
+- Java日志记录最佳实践 https://www.jianshu.com/p/546e9aace657
+- http://www.slf4j.org/manual.html
 - Floodlight Services: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/40402986/Floodlight+Services
 
 ```
@@ -47,3 +51,12 @@ sshfs sdnfp04_proxy:/home/student/ex3 remote_sshfs_ex3
 
 sshfs sdnfp04_proxy:/opt/floodlight/src/main/java/net/sdnlab/ex3 remote_java_ex3
 ```
+
+# Logger
+```
+// using traditional API
+logger.debug("Temperature set to {}. Old temperature was {}.", newT, oldT);
+```
+# Curiosity
+- private, protected, public privilege difference
+- package and project relation
