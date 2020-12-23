@@ -3,10 +3,13 @@ package net.sdnlab.ex3.task32;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
+import org.projectfloodlight.openflow.types.DatapathId;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -18,12 +21,15 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
+import net.floodlightcontroller.linkdiscovery.Link;
+import net.floodlightcontroller.linkdiscovery.internal.LinkInfo;
 
 public class Reactive implements IFloodlightModule, IOFMessageListener {
 	// Since we are listening to OpenFlow messages we need to register with the FloodlightProvider (IFloodlightProviderService class)
 	protected IFloodlightProviderService floodlightProvider;
 	protected IOFSwitchService switchService;
 	protected ILinkDiscoveryService linkDiscoverer;
+	private Set<DatapathId> setDatapathId;
 
 	// TODO: export logger output into log file
 	protected static Logger logger;
@@ -78,13 +84,36 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		linkDiscoverer = context.getServiceImpl(ILinkDiscoveryService.class);
+		
+		//
+		logger = LoggerFactory.getLogger(Reactive.class);
+		logger.info("Init");
 	}
 
 	@Override
 	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
 		// DONE Auto-generated method stub
 		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
+		logger.info("Start Up");
+		logger.info("Get all DPID");
+		setDatapathId = switchService.getAllSwitchDpids();
+		// wait until all the switches has been add to network
+		// TODO: remove this method to a more steady state
+		while (setDatapathId.size() < 10) {
+			setDatapathId = switchService.getAllSwitchDpids();
+		}
+		for (DatapathId dpid: setDatapathId) {
+			logger.info(dpid.toString());
+		}
+		Map<Link, LinkInfo> links = linkDiscoverer.getLinks();
+		logger.info(null, links.size());
+		logger.info("Get all links");
+		// TODO: remove this method to a more steady state
+		for (Link link : links.keySet()) {
+			logger.info(link.toString());
+		}
 
+		logger.info("Start Up End");
 	}
 
 }
