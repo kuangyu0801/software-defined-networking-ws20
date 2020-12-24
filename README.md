@@ -5,11 +5,12 @@
 ## 實作
 
 - Steps:
-    - [TODO] link state probing : create graph
+    - [DONE] link state probing : create graph
     - [TODO] calculate shortest path
     - [TODO] create flow when PACKET_IN
     - [TODO] install flow
     - [TODO] (test with trace route)
+    - [TODO] write python parsing script for xml
 
 - layer 3 match
 - the shortest path
