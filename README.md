@@ -16,6 +16,7 @@
     + hop as weight
     + dijkstra implementation maybe from _net.floodlightcontroller.topology.TopologyInstance.java_
     + dijkstra: https://github.com/floodlight/floodlight/blob/d737cb05656a6038f4e2277ffb4503d45b7b29cb/src/main/java/net/floodlightcontroller/topology/TopologyInstance.java#L578
+        + dijkstra demo slides from CS61B: https://docs.google.com/presentation/d/1_bw2z1ggUkquPdhl7gwdVBoTaoJmaZdpkV6MoAgxlJc/pub?start=false&loop=false&delayms=3000&slide=id.g771336078_0_180
     + cost map: https://github.com/floodlight/floodlight/blob/d737cb05656a6038f4e2277ffb4503d45b7b29cb/src/main/java/net/floodlightcontroller/topology/TopologyInstance.java#L657
     + 基本上來說是用priority queue, 如果link有update cost, 就要把舊的node刪掉, 插入新的node (但其實好像可以用一個叫做indexed queue的東西...) 
 - graph may be hard-coded or dynamically build (first hardcode to test dijkstra then replace with dynamic graph)
@@ -29,6 +30,10 @@
 - Link: http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/linkdiscovery/Link.html
 - BroadcastTree (Dijkstra return type): https://github.com/floodlight/floodlight/blob/d737cb05656a6038f4e2277ffb4503d45b7b29cb/src/main/java/net/floodlightcontroller/routing/BroadcastTree.java#L25
 - Interface IOFSwitchService: http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/core/internal/IOFSwitchService.html
+    + getSwitch()
+    + getAllSwitchDpids()
+- Interface ILinkDiscoveryService http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/linkdiscovery/ILinkDiscoveryService.html
+    + getSwitchLinks()
 ```
 sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/fattree.py --topo fattree --arp
 ```
