@@ -1,7 +1,4 @@
-import java.util.HashMap;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class ReactiveDemo {
@@ -11,7 +8,7 @@ public class ReactiveDemo {
     private static final int UTILIZATION = 2;
     private static final Logger logger = Logger.getLogger(ReactiveDemo.class.getSimpleName());
 
-    public Map<Link,Integer> initLinkCostMap(int type, Map<DatapathId, Set<Link>> links) {
+    public static Map<Link,Integer> initLinkCostMap(int type, Map<DatapathId, Set<Link>> links) {
         Map<Link, Integer> linkCost = new HashMap<Link, Integer>();
         //int tunnel_weight = portsWithLinks.size() + 1;
 
@@ -135,7 +132,7 @@ public class ReactiveDemo {
         }
     }
 
-    private BroadcastTree dijkstra(Map<DatapathId, Set<Link>> links, DatapathId root,
+    private static BroadcastTree dijkstra(Map<DatapathId, Set<Link>> links, DatapathId root,
                                    Map<Link, Integer> linkCost,
                                    boolean isDstRooted) {
         HashMap<DatapathId, Link> nexthoplinks = new HashMap<DatapathId, Link>();
@@ -222,5 +219,77 @@ public class ReactiveDemo {
         BroadcastTree ret = new BroadcastTree(nexthoplinks, cost);
 
         return ret;
+    }
+
+    public static void main(String[] args) {
+        DatapathId dpid1 = new DatapathId(1);
+        DatapathId dpid2 = new DatapathId(2);
+        DatapathId dpid101 = new DatapathId(101);
+        DatapathId dpid102 = new DatapathId(102);
+        DatapathId dpid103 = new DatapathId(103);
+        DatapathId dpid104 = new DatapathId(104);
+        DatapathId dpid201 = new DatapathId(201);
+        DatapathId dpid202 = new DatapathId(202);
+        DatapathId dpid203 = new DatapathId(203);
+        DatapathId dpid204 = new DatapathId(204);
+
+        Map<DatapathId, Set<Link>> mapLinks = new HashMap<>();
+
+        Link[] links = new Link[16];
+
+        // 1 -> 1.3, 1.4, 2.3, 2,4
+        links[0] = new Link(dpid1, dpid103);
+        links[1] = new Link(dpid1, dpid104);
+        links[2] = new Link(dpid1, dpid203);
+        links[3] = new Link(dpid1, dpid204);
+
+        // 2 -> 1.3, 1.4, 2.3, 2,4
+        links[4] = new Link(dpid2, dpid103);
+        links[5] = new Link(dpid2, dpid104);
+        links[6] = new Link(dpid2, dpid203);
+        links[7] = new Link(dpid2, dpid204);
+
+        // 1.1 -> 1.3, 1.4
+        links[8] = new Link(dpid101, dpid103);
+        links[9] = new Link(dpid101, dpid104);
+        // 1.2 -> 1.3, 1.4
+        links[10] = new Link(dpid102, dpid103);
+        links[11] = new Link(dpid102, dpid104);
+
+        // 2.1 -> 2.3, 2.4
+        links[12] = new Link(dpid201, dpid203);
+        links[13] = new Link(dpid201, dpid204);
+        links[14] = new Link(dpid202, dpid203);
+        links[15] = new Link(dpid202, dpid204);
+
+        for (Link link : links) {
+            DatapathId src = link.src;
+            DatapathId dst = link.dst;
+            mapLinks.putIfAbsent(src, new HashSet<>());
+            mapLinks.putIfAbsent(dst, new HashSet<>());
+            mapLinks.get(src).add(link);
+            mapLinks.get(dst).add(link);
+        }
+
+        for (DatapathId dpid : mapLinks.keySet()) {
+            System.out.println(dpid.getLong() + " has following neighbor: ");
+            for (Link link : mapLinks.get(dpid)) {
+                if (link.src == dpid) {
+                    System.out.println(link.dst.getLong());
+                } else {
+                    System.out.println(link.src.getLong());
+                }
+            }
+        }
+
+        Map<Link, Integer> linkCost = initLinkCostMap(HOPCOUNT, mapLinks);
+        // TODO: there are no links in broadcastTree
+        BroadcastTree broadcastTree = dijkstra(mapLinks, dpid101, linkCost, true);
+        for (DatapathId dpid : broadcastTree.links.keySet()) {
+            Link link = broadcastTree.links.get(dpid);
+            if (link != null) {
+                System.out.println(link.src.getLong() + "---" + link.dst.getLong());
+            }
+        }
     }
 }

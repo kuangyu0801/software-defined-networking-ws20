@@ -7,6 +7,11 @@ public class Link {
         this.dst = new DatapathId(dst);
     }
 
+    public Link(DatapathId dpid, DatapathId dpid1) {
+        this.src = dpid;
+        this.dst = dpid1;
+    }
+
     public DatapathId getSrc() {
         return src;
     }
