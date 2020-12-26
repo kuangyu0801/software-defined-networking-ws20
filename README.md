@@ -35,6 +35,7 @@
     + getAllSwitchDpids()
 - Interface ILinkDiscoveryService http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/linkdiscovery/ILinkDiscoveryService.html
     + getSwitchLinks()
+- IOFSwitch http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/core/IOFSwitch.html    
 ```
 sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/fattree.py --topo fattree --arp
 ```
