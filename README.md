@@ -66,3 +66,5 @@ logger.debug("Temperature set to {}. Old temperature was {}.", newT, oldT);
 # Curiosity
 - private, protected, public privilege difference
 - package and project relation
+- enumeration with java
+
