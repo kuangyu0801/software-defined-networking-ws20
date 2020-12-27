@@ -1,33 +1,65 @@
 package net.sdnlab.ex3.task31;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.FileHandler;
+import java.util.logging.Logger;
 
+import org.projectfloodlight.openflow.protocol.OFFactories;
+import org.projectfloodlight.openflow.protocol.OFFactory;
+import org.projectfloodlight.openflow.protocol.OFFlowAdd;
 import org.projectfloodlight.openflow.protocol.OFMessage;
+import org.projectfloodlight.openflow.protocol.OFPacketIn;
+import org.projectfloodlight.openflow.protocol.OFPacketOut;
 import org.projectfloodlight.openflow.protocol.OFType;
+import org.projectfloodlight.openflow.protocol.OFVersion;
+import org.projectfloodlight.openflow.protocol.action.OFAction;
+import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.action.OFActions;
+import org.projectfloodlight.openflow.protocol.match.Match;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
+import org.projectfloodlight.openflow.types.ArpOpcode;
+import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.EthType;
+import org.projectfloodlight.openflow.types.IPv4Address;
+import org.projectfloodlight.openflow.types.IPv4AddressWithMask;
+import org.projectfloodlight.openflow.types.MacAddress;
+import org.projectfloodlight.openflow.types.OFPort;
 
 import net.floodlightcontroller.core.FloodlightContext;
+import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFMessageListener;
 import net.floodlightcontroller.core.IOFSwitch;
+import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
+import net.floodlightcontroller.packet.ARP;
+import net.floodlightcontroller.packet.Data;
+import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPacket;
 
 public class ARPHandler implements IFloodlightModule, IOFMessageListener {
+	
+	private static final Logger logger = Logger.getLogger(ARPHandler.class.getSimpleName());
+	
 	protected IFloodlightProviderService floodlightProvider;
 	protected IOFSwitchService switchService;
 	private Map<IPv4Address, MacAddress> centralArpCache;
-	private Map<IPv4Address, OFPort> routingTableS1;
-	private Map<IPv4Address, OFPort> routingTableS2;
-	private Map<IPv4Address, OFPort> routingTableS3;
-	private Map<IPv4Address, OFPort> routingTableS4;
+	private Map<IPv4AddressWithMask, OFPort> routingTableS1;
+	private Map<IPv4AddressWithMask, OFPort> routingTableS2;
+	private Map<IPv4AddressWithMask, OFPort> routingTableS3;
+	private Map<IPv4AddressWithMask, OFPort> routingTableS4;
 
 
 	@Override
 	public String getName() {
 		// TODO Auto-generated method stub
-		return null;
+		return this.getClass().getSimpleName();
 	}
 
 	@Override
@@ -80,6 +112,8 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 				}else if (eth.getEtherType() == EthType.IPv4) {
 					installStaticEntries();
 				}
+		default:
+			break;
 		}
 		return null;
 	}
@@ -100,8 +134,7 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 						.setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
 						.setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
 						.setTargetProtocolAddress(arpRequest.getSenderProtocolAddress())
-						.setPayload(new Data(new byte[] {0x01})))
-				);
+						.setPayload(new Data(new byte[] {0x01})));
 		// Send ARP reply.
 		//sendPOMessage(arpReply, floodlightProvider.getSwitch(arpRequest.getSwitchId()), arpRequest.getInPort());
 
@@ -109,27 +142,28 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		byte[] serializedData = arpReply.serialize();
 		OFPacketOut po = sw.getOFFactory().buildPacketOut()
 				.setData(serializedData)
-				.setActions(Collections.singletonList((OFAction) sw.getOFFactory().actions().output(OFPort.of(inPort),0xffFFffFF)))
+				.setActions(Collections.singletonList((OFAction) sw.getOFFactory().actions().output(inPort,0xffFFffFF)))
 				.setInPort(OFPort.CONTROLLER)
 				.build();
 		sw.write(po);
 	}
-
+	
+	// TODO: finish this method
 	public void forwardMessage(Ethernet eth){
 		ARP arp = (ARP) eth.getPayload();
 		IPv4Address targetIPAddress = arp.getTargetProtocolAddress();
-
-		OFPort outPort =
+		
+		//OFPort outPort =
 	}
 
 	public void installStaticEntries(){
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
-		for(IPv4Address dstIP : routingTableS1.keySet()){
-			OFPort outPort = routingTableS1.get(dstIP);
+		for(IPv4AddressWithMask ipv4AddressWithMask : routingTableS1.keySet()){
+			OFPort outPort = routingTableS1.get(ipv4AddressWithMask);
 			//set match field
 			Match match = myFactory.buildMatch()
 					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-					.setMasked(MatchField.IPV4_DST, dstIP)
+					.setMasked(MatchField.IPV4_DST, ipv4AddressWithMask)
 					.build();
 			//set actions
 			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
@@ -147,8 +181,6 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 					.build();
 			switchService.getSwitch(DatapathId.of(1)).write(flowAdd);
 		}
-
-
 	}
 
 	public void setRoutingTables(){
@@ -216,18 +248,31 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		return null;
 	}
 
+	private void setupLogger() {
+		// DONE: export logger output into log file
+		try {
+			FileHandler fileHandler = new FileHandler("/home/student/ex3/task31.log");
+			logger.addHandler(fileHandler);
+		} catch (Exception e) {
+	        System.out.println("Failed to configure logging to file");
+	    }
+	}
+	
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
-		// TODO Auto-generated method stub
+		// DONE Auto-generated method stub
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		centralArpCache = new HashMap<>();
+		setupLogger();
+		logger.info("Init");
 	}
 
 	@Override
 	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-		// TODO Auto-generated method stub
-
+		// DONE Auto-generated method stub
+		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
+		logger.info("Start Up");
 	}
 
 }

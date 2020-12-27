@@ -1,5 +1,9 @@
 # 3.1 – Centralized ARP Handling
 
+-
+```
+sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/task14topo.py --topo task14topo
+```
 # 3.2 – Reactive Routing
 
 ## 實作
