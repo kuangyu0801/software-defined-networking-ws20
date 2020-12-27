@@ -49,7 +49,8 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 	
 	protected IFloodlightProviderService floodlightProvider;
 	protected IOFSwitchService switchService;
-	private Map<IPv4Address, MacAddress> centralArpCache;
+	private Map<IPv4Address, MacAddress> mapCentralArpCache;
+	// TODO: refactor name
 	private Map<IPv4AddressWithMask, OFPort> routingTableS1;
 	private Map<IPv4AddressWithMask, OFPort> routingTableS2;
 	private Map<IPv4AddressWithMask, OFPort> routingTableS3;
@@ -85,27 +86,27 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 				if (eth.getEtherType() == EthType.ARP) {
 					ARP arp = (ARP) eth.getPayload();
 					if (arp.getOpCode() == ArpOpcode.REQUEST){
-						logger.info ("Received ARP request in switch "+sw.getId()+" by port "+inPort);
+						logger.info ("Received ARP request in switch " + sw.getId() + " by port " + inPort);
 
 						IPv4Address sourceIPAddress = arp.getSenderProtocolAddress();
-						if (!centralArpCache.containsKey(sourceIPAddress)){
+						if (!mapCentralArpCache.containsKey(sourceIPAddress)){
 							//get source MAC and store it in central ARP cache
-							MacAddress sourceMACAddress = arp.getSenderHardwareAddress();
-							centralArpCache.put(sourceIPAddress, sourceMACAddress);
+							MacAddress srcMACAddress = arp.getSenderHardwareAddress();
+							mapCentralArpCache.put(sourceIPAddress, srcMACAddress);
 						}
 
 						//Controller queries internal ARP cache for MAC address
-						IPv4Address targetIPAddress = arp.getTargetProtocolAddress();
-						if (centralArpCache.containsKey(targetIPAddress)){
+						IPv4Address dstIPAddress = arp.getTargetProtocolAddress();
+						if (mapCentralArpCache.containsKey(dstIPAddress)){
 							//if internal ARP cahce contains arp_tha, immediately inject appropriate reply
 							sendARPReply(sw, inPort, arp);
-						}else{
+						} else {
 							//otherwise redirects the ARP request to the target host and save the reply
 							//to its internal ARP cache, before injecting reply
 							forwardMessage(eth);
 						}
 
-					}else if (arp.getOpCode() == ArpOpcode.REPLY){
+					} else if (arp.getOpCode() == ArpOpcode.REPLY){
 						//MacAddress sourceMACAddress = arp.getSenderHardwareAddress();
 						forwardMessage(eth);
 					}
@@ -118,10 +119,11 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		return null;
 	}
 
+	// TODO: finish ARP reply
 	public void sendARPReply(IOFSwitch sw, OFPort inPort, ARP arpRequest){
 		// Create an ARP reply frame (from target (source) to source (destination)).
 		IPacket arpReply = new Ethernet()
-				.setSourceMACAddress(centralArpCache.get(arpRequest.getTargetProtocolAddress()))
+				.setSourceMACAddress(mapCentralArpCache.get(arpRequest.getTargetProtocolAddress()))
 				.setDestinationMACAddress(arpRequest.getSenderHardwareAddress())
 				.setEtherType(EthType.ARP)
 				.setPayload(new ARP()
@@ -130,7 +132,7 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 						.setOpCode(ARP.OP_REPLY)
 						.setHardwareAddressLength((byte)6)
 						.setProtocolAddressLength((byte)4)
-						.setSenderHardwareAddress(centralArpCache.get(arpRequest.getTargetProtocolAddress()))
+						.setSenderHardwareAddress(mapCentralArpCache.get(arpRequest.getTargetProtocolAddress()))
 						.setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
 						.setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
 						.setTargetProtocolAddress(arpRequest.getSenderProtocolAddress())
@@ -188,13 +190,15 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		routingTableS1.put(IPv4AddressWithMask.of("10.10.1.1/8"), OFPort.of(1));
 		routingTableS1.put(IPv4AddressWithMask.of("10.10.1.2/8"), OFPort.of(2));
 		routingTableS1.put(IPv4AddressWithMask.of("10.10.1.3/8"), OFPort.of(3));
+		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.0/8"), OFPort.of(4));/*
 		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.1/8"), OFPort.of(4));
 		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.2/8"), OFPort.of(4));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.3/8"), OFPort.of(4));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.1/8"), OFPort.of(4));
+		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.3/8"), OFPort.of(4));*/
+		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.0/8"), OFPort.of(4));/*
 		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.2/8"), OFPort.of(4));
+		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.1/8"), OFPort.of(4));
 		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.3/8"), OFPort.of(4));
-
+*/
 		routingTableS2 = new HashMap<>();
 		routingTableS2.put(IPv4AddressWithMask.of("10.10.2.1/8"), OFPort.of(1));
 		routingTableS2.put(IPv4AddressWithMask.of("10.10.2.2/8"), OFPort.of(2));
@@ -263,7 +267,7 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		// DONE Auto-generated method stub
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
-		centralArpCache = new HashMap<>();
+		mapCentralArpCache = new HashMap<>();
 		setupLogger();
 		logger.info("Init");
 	}
