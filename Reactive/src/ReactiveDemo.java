@@ -173,18 +173,7 @@ public class ReactiveDemo {
             }
 
             for (Link link : links.get(cnode)) {
-                DatapathId neighbor;
-
-                if (isDstRooted == true) {
-                    neighbor = link.getSrc();
-                } else {
-                    neighbor = link.getDst();
-                }
-
-                // links directed toward cnode will result in this condition
-                if (neighbor.equals(cnode)) {
-                    continue;
-                }
+                DatapathId neighbor = (link.getSrc().equals(cnode)) ? link.getDst() : link.getSrc();
 
                 if (seen.containsKey(neighbor)) {
                     continue;
@@ -197,8 +186,7 @@ public class ReactiveDemo {
                 }
 
                 int ndist = cdist + w; // the weight of the link, always 1 in current version of floodlight.
-                logger.info("Neighbor: " + neighbor);
-                logger.info("Cost: " + cost);
+                logger.info("Neighbor: " + neighbor.getLong());
                 logger.info("Neighbor cost: " + cost.get(neighbor));
 
                 if (ndist < cost.get(neighbor)) {
@@ -283,12 +271,14 @@ public class ReactiveDemo {
         }
 
         Map<Link, Integer> linkCost = initLinkCostMap(HOPCOUNT, mapLinks);
-        // TODO: there are no links in broadcastTree
-        BroadcastTree broadcastTree = dijkstra(mapLinks, dpid101, linkCost, true);
+        // DONE: there are no links in broadcastTree
+        BroadcastTree broadcastTree = dijkstra(mapLinks, dpid101, linkCost, false);
         for (DatapathId dpid : broadcastTree.links.keySet()) {
             Link link = broadcastTree.links.get(dpid);
             if (link != null) {
-                System.out.println(link.src.getLong() + "---" + link.dst.getLong());
+                System.out.print("Node: " + dpid.getLong());
+                System.out.println(", Cost: " + broadcastTree.costs.get(dpid));
+                System.out.println("Link: " + link.src.getLong() + "---" + link.dst.getLong());
             }
         }
     }
