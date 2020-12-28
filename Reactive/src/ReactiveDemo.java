@@ -131,10 +131,11 @@ public class ReactiveDemo {
                 return linkCost;
         }
     }
+    private static DatapathId getLinkOtherEnd(DatapathId src, Link link) {
+        return (link.getSrc().equals(src)) ? link.getDst() : link.getSrc();
+    }
 
-    private static BroadcastTree dijkstra(Map<DatapathId, Set<Link>> links, DatapathId root,
-                                   Map<Link, Integer> linkCost,
-                                   boolean isDstRooted) {
+    private static BroadcastTree dijkstra(DatapathId root, Map<DatapathId, Set<Link>> links, Map<Link, Integer> linkCost) {
         HashMap<DatapathId, Link> nexthoplinks = new HashMap<DatapathId, Link>();
         HashMap<DatapathId, Integer> cost = new HashMap<DatapathId, Integer>();
         int w;
@@ -146,34 +147,34 @@ public class ReactiveDemo {
         }
 
         HashMap<DatapathId, Boolean> seen = new HashMap<DatapathId, Boolean>();
-        PriorityQueue<NodeDist> nodeq = new PriorityQueue<NodeDist>();
-        nodeq.add(new NodeDist(root, 0));
+        PriorityQueue<NodeDist> pqNode = new PriorityQueue<NodeDist>();
+        pqNode.add(new NodeDist(root, 0));
         cost.put(root, 0);
 
         //log.debug("{}", links);
 
-        while (nodeq.peek() != null) {
-            NodeDist n = nodeq.poll();
-            DatapathId cnode = n.getNode();
-            int cdist = n.getDist();
+        while (pqNode.peek() != null) {
+            NodeDist n = pqNode.poll();
+            DatapathId curDpid = n.getNode();
+            int curDist = n.getDist();
 
-            if (cdist >= MAX_PATH_WEIGHT) {
+            if (curDist >= MAX_PATH_WEIGHT) {
                 break;
             }
 
-            if (seen.containsKey(cnode)) {
+            if (seen.containsKey(curDpid)) {
                 continue;
             }
 
-            seen.put(cnode, true);
+            seen.put(curDpid, true);
 
-            //log.debug("cnode {} and links {}", cnode, links.get(cnode));
-            if (links.get(cnode) == null) {
+            //log.debug("curDpid {} and links {}", curDpid, links.get(curDpid));
+            if (links.get(curDpid) == null) {
                 continue;
             }
 
-            for (Link link : links.get(cnode)) {
-                DatapathId neighbor = (link.getSrc().equals(cnode)) ? link.getDst() : link.getSrc();
+            for (Link link : links.get(curDpid)) {
+                DatapathId neighbor = getLinkOtherEnd(curDpid, link);
 
                 if (seen.containsKey(neighbor)) {
                     continue;
@@ -185,7 +186,7 @@ public class ReactiveDemo {
                     w = linkCost.get(link);
                 }
 
-                int ndist = cdist + w; // the weight of the link, always 1 in current version of floodlight.
+                int ndist = curDist + w; // the weight of the link, always 1 in current version of floodlight.
                 logger.info("Neighbor: " + neighbor.getLong());
                 logger.info("Neighbor cost: " + cost.get(neighbor));
 
@@ -197,9 +198,9 @@ public class ReactiveDemo {
                     // Remove an object that's already in there.
                     // Note that the comparison is based on only the node id,
                     // and not node id and distance.
-                    nodeq.remove(ndTemp);
+                    pqNode.remove(ndTemp);
                     // add the current object to the queue.
-                    nodeq.add(ndTemp);
+                    pqNode.add(ndTemp);
                 }
             }
         }
@@ -208,8 +209,20 @@ public class ReactiveDemo {
 
         return ret;
     }
+    // returning all hops from dst to src, including dst
+    private static List<DatapathId> createFlow(DatapathId src, DatapathId dst, BroadcastTree mst) {
+        List<DatapathId> list = new ArrayList<>();
+        DatapathId next = dst;
+        while (!next.equals(src)) {
+            list.add(next);
+            next = getLinkOtherEnd(next, mst.links.get(next));
+        }
+        return list;
+    }
 
     public static void main(String[] args) {
+
+        // creating all switches
         DatapathId dpid1 = new DatapathId(1);
         DatapathId dpid2 = new DatapathId(2);
         DatapathId dpid101 = new DatapathId(101);
@@ -222,7 +235,9 @@ public class ReactiveDemo {
         DatapathId dpid204 = new DatapathId(204);
 
         Map<DatapathId, Set<Link>> mapLinks = new HashMap<>();
+        DatapathId[] dpidArr = new DatapathId[]{dpid1, dpid2, dpid101, dpid102, dpid103, dpid104, dpid201, dpid202, dpid203, dpid204};
 
+        // creating all links
         Link[] links = new Link[16];
 
         // 1 -> 1.3, 1.4, 2.3, 2,4
@@ -259,6 +274,7 @@ public class ReactiveDemo {
             mapLinks.get(dst).add(link);
         }
 
+
         for (DatapathId dpid : mapLinks.keySet()) {
             System.out.println(dpid.getLong() + " has following neighbor: ");
             for (Link link : mapLinks.get(dpid)) {
@@ -271,14 +287,27 @@ public class ReactiveDemo {
         }
 
         Map<Link, Integer> linkCost = initLinkCostMap(HOPCOUNT, mapLinks);
-        // DONE: there are no links in broadcastTree
-        BroadcastTree broadcastTree = dijkstra(mapLinks, dpid101, linkCost, false);
+        // find shortest path tree for switch 101
+        BroadcastTree broadcastTree = dijkstra(dpid101, mapLinks,linkCost);
+        System.out.println("| Node | Cost |    Link    |");
+        System.out.println("| ---- | ---- | ---------- |");
         for (DatapathId dpid : broadcastTree.links.keySet()) {
             Link link = broadcastTree.links.get(dpid);
             if (link != null) {
-                System.out.print("Node: " + dpid.getLong());
-                System.out.println(", Cost: " + broadcastTree.costs.get(dpid));
-                System.out.println("Link: " + link.src.getLong() + "---" + link.dst.getLong());
+                System.out.println("| " + String.format("%03d", dpid.getLong()) + "  |   " + broadcastTree.costs.get(dpid)
+                        + "  | " + String.format("%03d", dpid.getLong()) + "---" + String.format("%03d", getLinkOtherEnd(dpid, link).getLong()) + "  |   ");
+            }
+        }
+
+        // find shortest path from 101 to all other node
+        for (DatapathId dst : dpidArr) {
+            if (!dst.equals(dpid101)) {
+                System.out.println("To " + String.format("%03d", dst.getLong()));
+                List<DatapathId> listDatapathIds = createFlow(dpid101, dst, broadcastTree);
+                for (DatapathId dpid : listDatapathIds) {
+                    System.out.print(String.format("%03d", dpid.getLong()) + "---");
+                }
+                System.out.println(String.format("%03d", dpid101.getLong()));
             }
         }
     }
