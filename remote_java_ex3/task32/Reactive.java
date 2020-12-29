@@ -13,7 +13,10 @@ import java.util.logging.Logger;
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.IPv4Address;
+import org.projectfloodlight.openflow.types.OFPort;
 
+import javafx.util.Pair;
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFMessageListener;
@@ -27,6 +30,8 @@ import net.floodlightcontroller.core.types.NodePortTuple;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.linkdiscovery.Link;
 import net.floodlightcontroller.linkdiscovery.internal.LinkInfo;
+import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.routing.BroadcastTree;
 import net.floodlightcontroller.topology.TopologyInstance;
 
@@ -43,10 +48,18 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	protected IOFSwitchService switchService;
 	protected ILinkDiscoveryService linkDiscoverer;
 
-	private Set<DatapathId> setDpids;
-	private Map<DatapathId, Set<Link>> mapSwitchLinks;
-
-	// static 
+	private Set<DatapathId> dpidSet;
+	private Map<DatapathId, Set<Link>> switchLinkMap;
+	// to look up host with its connecting switch and port
+	private Map<IPv4Address, Pair<DatapathId, OFPort>> edgeSwitchMap;
+	// to look up shortest path wtih root Minimum spanning tree of that root
+	private Map<IPv4Address, BroadcastTree> rootMstMap;
+	private Map<Link,Integer> linkCostMap;
+	
+	protected Reactive() {
+		
+	}
+	
 	@Override
 	public String getName() {
 		// DONE Auto-generated method stub
@@ -65,10 +78,29 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		return false;
 	}
 
+	private static DatapathId getLinkOtherEnd(DatapathId src, Link link) {
+		return (link.getSrc().equals(src)) ? link.getDst() : link.getSrc();
+	}
+
 	@Override
 	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		// TODO Auto-generated method stub
-		return null;
+		// Inject the first packet directly at the target switch
+		switch(msg.getType()) {
+			case PACKET_IN:
+				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+				IPv4 ipv4Pkt= (IPv4) eth.getPayload();
+				IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
+				if (!rootMstMap.containsKey(srcAddr)) {
+					calShortestPath(srcAddr);
+					createFlow(srcAddr);
+					installFlow(srcAddr);
+				}
+				break;
+			default:
+				break;
+		}
+		return Command.CONTINUE;
 	}
 
 	@Override
@@ -89,6 +121,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		Collection<Class<? extends IFloodlightService>> l =
 				new ArrayList<Class<? extends IFloodlightService>>();
 		l.add(IFloodlightProviderService.class);
+		l.add(ILinkDiscoveryService.class);
+		l.add(IOFSwitchService.class);
 		return l;
 	}
 	
@@ -118,6 +152,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
 		logger.info("Start Up");
 		enableReactiveRouting();
+		setRoutingTables();
 		logger.info("Start Up End");
 	}
 
@@ -136,53 +171,53 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	// DONE: STEP-1: link state detection: create directed graph for djikstra
 	private void createNetworkGraph() {
 		logger.info("Get all DatapathID");
-		setDpids = switchService.getAllSwitchDpids();
+		dpidSet = switchService.getAllSwitchDpids();
 
 		// TODO: find out a way to avoid this part
 		// wait until all the switches has been add to network
-		while (setDpids.size() < 10) {
-			setDpids = switchService.getAllSwitchDpids();
+		while (dpidSet.size() < 10) {
+			dpidSet = switchService.getAllSwitchDpids();
 		}
 
-		logger.info("Total switch number: " + setDpids.size());
+		logger.info("Total switch number: " + dpidSet.size());
 		logger.info("Printing all DatapathID");
 
-		for (DatapathId dpid: setDpids) {
+		for (DatapathId dpid: dpidSet) {
 			logger.info(dpid.toString());
 		}
 
 		logger.info("Getting switch-link map");
 
-		mapSwitchLinks = linkDiscoverer.getSwitchLinks();
-		while (mapSwitchLinks.size() < 10) {
-			mapSwitchLinks = linkDiscoverer.getSwitchLinks();
-			logger.info("Current switch links map size: " + mapSwitchLinks.size());
+		switchLinkMap = linkDiscoverer.getSwitchLinks();
+		while (switchLinkMap.size() < 10) {
+			switchLinkMap = linkDiscoverer.getSwitchLinks();
+			logger.info("Current switch links map size: " + switchLinkMap.size());
 		}
 
 		logger.info("Get all links");
 
 		// TODO: remove this method to a more steady state
-		for (DatapathId dpid : setDpids) {
+		for (DatapathId dpid : dpidSet) {
 			logger.info("Links of switch" + dpid.toString());
-			mapSwitchLinks.containsKey(dpid);
-			for (Link link : mapSwitchLinks.get(dpid)) {
+			switchLinkMap.containsKey(dpid);
+			for (Link link : switchLinkMap.get(dpid)) {
 				logger.info(link.toString());
 			}
 		}
 	}
 
 	// TODO: STEP-2: calculate shortest path: using dijkstra
-	private void calShortestPath() {
+	private void calShortestPath(IPv4Address srcAddr) {
 
 	}
 
 	// TODO: STEP-3: ceate flow
-	private void createFlow() {
+	private void createFlow(IPv4Address srcAddr) {
 
 	}
 
-	// TODO: STEP-4: install flow (when PACKET_IN ? or install right away
-	private void installFlow() {
+	// TODO: STEP-4: install flow when PACKET_IN event (reactivly)
+	private void installFlow(IPv4Address srcAddr) {
 
 	}
 
@@ -315,7 +350,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	}
 
 	// reference: https://github.com/floodlight/floodlight/blob/d737cb05656a6038f4e2277ffb4503d45b7b29cb/src/main/java/net/floodlightcontroller/topology/TopologyInstance.java#L444
-	private class NodeDist implements Comparable<NodeDist> {
+	private static class NodeDist implements Comparable<NodeDist> {
 		private final DatapathId node;
 		public DatapathId getNode() {
 			return node;
@@ -361,6 +396,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 			assert false : "hashCode not designed";
 			return 42;
 		}
+		
 	}
 
 	/*
@@ -380,7 +416,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 
 		HashMap<DatapathId, Boolean> seen = new HashMap<DatapathId, Boolean>();
 		PriorityQueue<NodeDist> pqNode = new PriorityQueue<NodeDist>();
-		pqNode.add(new NodeDist(root, 0));
+		NodeDist rootNode = new NodeDist(root, 0);
+		pqNode.offer(rootNode);
 		cost.put(root, 0);
 
 		//log.debug("{}", links);
@@ -440,5 +477,18 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		BroadcastTree ret = new BroadcastTree(nexthoplinks, cost);
 
 		return ret;
+	}
+
+	public void setRoutingTables() {
+		//Set up the routing table for first PACKET_IN inject
+		edgeSwitchMap = new HashMap<>();
+		edgeSwitchMap.put(IPv4Address.of("10.10.1.1"), new Pair<DatapathId, OFPort>(DatapathId.of(0x101), OFPort.of(3)));
+		edgeSwitchMap.put(IPv4Address.of("10.10.1.2"), new Pair<DatapathId, OFPort>(DatapathId.of(0x101), OFPort.of(4)));
+		edgeSwitchMap.put(IPv4Address.of("10.10.1.3"), new Pair<DatapathId, OFPort>(DatapathId.of(0x102), OFPort.of(3)));
+		edgeSwitchMap.put(IPv4Address.of("10.10.1.4"), new Pair<DatapathId, OFPort>(DatapathId.of(0x102), OFPort.of(4)));
+		edgeSwitchMap.put(IPv4Address.of("10.10.2.1"), new Pair<DatapathId, OFPort>(DatapathId.of(0x201), OFPort.of(3)));
+		edgeSwitchMap.put(IPv4Address.of("10.10.2.2"), new Pair<DatapathId, OFPort>(DatapathId.of(0x201), OFPort.of(4)));
+		edgeSwitchMap.put(IPv4Address.of("10.10.2.3"), new Pair<DatapathId, OFPort>(DatapathId.of(0x202), OFPort.of(3)));
+		edgeSwitchMap.put(IPv4Address.of("10.10.2.4"), new Pair<DatapathId, OFPort>(DatapathId.of(0x202), OFPort.of(4)));
 	}
 }
