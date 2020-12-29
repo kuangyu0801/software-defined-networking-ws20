@@ -367,9 +367,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	 * Dijkstra that calculates destination rooted trees over the entire topology.
 	 * reference implementation: https://github.com/floodlight/floodlight/blob/d737cb05656a6038f4e2277ffb4503d45b7b29cb/src/main/java/net/floodlightcontroller/topology/TopologyInstance.java#L578
 	 */
-	private BroadcastTree dijkstra(Map<DatapathId, Set<Link>> links, DatapathId root,
-								   Map<Link, Integer> linkCost,
-								   boolean isDstRooted) {
+	private static BroadcastTree dijkstra(DatapathId root, Map<DatapathId, Set<Link>> links, Map<Link, Integer> linkCost) {
 		HashMap<DatapathId, Link> nexthoplinks = new HashMap<DatapathId, Link>();
 		HashMap<DatapathId, Integer> cost = new HashMap<DatapathId, Integer>();
 		int w;
@@ -381,36 +379,38 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		}
 
 		HashMap<DatapathId, Boolean> seen = new HashMap<DatapathId, Boolean>();
-		PriorityQueue<NodeDist> nodeq = new PriorityQueue<NodeDist>();
-		nodeq.add(new NodeDist(root, 0));
+		PriorityQueue<NodeDist> pqNode = new PriorityQueue<NodeDist>();
+		pqNode.add(new NodeDist(root, 0));
 		cost.put(root, 0);
 
 		//log.debug("{}", links);
 
-		while (nodeq.peek() != null) {
-			NodeDist n = nodeq.poll();
-			DatapathId cnode = n.getNode();
-			int cdist = n.getDist();
+		while (pqNode.peek() != null) {
+			NodeDist n = pqNode.poll();
+			DatapathId curDpid = n.getNode();
+			int curDist = n.getDist();
 
-			if (cdist >= MAX_PATH_WEIGHT) break;
-			if (seen.containsKey(cnode)) continue;
-			seen.put(cnode, true);
+			if (curDist >= MAX_PATH_WEIGHT) {
+				break;
+			}
 
-			//log.debug("cnode {} and links {}", cnode, links.get(cnode));
-			if (links.get(cnode) == null) continue;
-			for (Link link : links.get(cnode)) {
-				DatapathId neighbor;
+			if (seen.containsKey(curDpid)) {
+				continue;
+			}
 
-				if (isDstRooted == true) {
-					neighbor = link.getSrc();
-				} else {
-					neighbor = link.getDst();
+			seen.put(curDpid, true);
+
+			//log.debug("curDpid {} and links {}", curDpid, links.get(curDpid));
+			if (links.get(curDpid) == null) {
+				continue;
+			}
+
+			for (Link link : links.get(curDpid)) {
+				DatapathId neighbor = getLinkOtherEnd(curDpid, link);
+
+				if (seen.containsKey(neighbor)) {
+					continue;
 				}
-
-				// links directed toward cnode will result in this condition
-				if (neighbor.equals(cnode)) continue;
-
-				if (seen.containsKey(neighbor)) continue;
 
 				if (linkCost == null || linkCost.get(link) == null) {
 					w = 1;
@@ -418,9 +418,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 					w = linkCost.get(link);
 				}
 
-				int ndist = cdist + w; // the weight of the link, always 1 in current version of floodlight.
-				logger.info("Neighbor: " + neighbor);
-				logger.info("Cost: "+ cost);
+				int ndist = curDist + w; // the weight of the link, always 1 in current version of floodlight.
+				logger.info("Neighbor: " + neighbor.getLong());
 				logger.info("Neighbor cost: " + cost.get(neighbor));
 
 				if (ndist < cost.get(neighbor)) {
@@ -431,9 +430,9 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 					// Remove an object that's already in there.
 					// Note that the comparison is based on only the node id,
 					// and not node id and distance.
-					nodeq.remove(ndTemp);
+					pqNode.remove(ndTemp);
 					// add the current object to the queue.
-					nodeq.add(ndTemp);
+					pqNode.add(ndTemp);
 				}
 			}
 		}
