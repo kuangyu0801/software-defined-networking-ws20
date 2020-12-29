@@ -18,14 +18,12 @@ import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.protocol.OFVersion;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
-import org.projectfloodlight.openflow.protocol.action.OFActions;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.types.ArpOpcode;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.EthType;
 import org.projectfloodlight.openflow.types.IPv4Address;
-import org.projectfloodlight.openflow.types.IPv4AddressWithMask;
 import org.projectfloodlight.openflow.types.MacAddress;
 import org.projectfloodlight.openflow.types.OFPort;
 
@@ -44,18 +42,15 @@ import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPacket;
 
 public class ARPHandler implements IFloodlightModule, IOFMessageListener {
-	
+
 	private static final Logger logger = Logger.getLogger(ARPHandler.class.getSimpleName());
-	
+
 	protected IFloodlightProviderService floodlightProvider;
 	protected IOFSwitchService switchService;
+	private boolean isInstalled = false;
 	private Map<IPv4Address, MacAddress> mapCentralArpCache;
-	// TODO: refactor name
-	private Map<IPv4AddressWithMask, OFPort> routingTableS1;
-	private Map<IPv4AddressWithMask, OFPort> routingTableS2;
-	private Map<IPv4AddressWithMask, OFPort> routingTableS3;
-	private Map<IPv4AddressWithMask, OFPort> routingTableS4;
-
+	private Map<DatapathId, Map<IPv4Address, OFPort>> mapRoutingTables;
+	private Map<IPv4Address, DatapathId> mapHostToSwitch;
 
 	@Override
 	public String getName() {
@@ -80,47 +75,48 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		// TODO Auto-generated method stub
 		switch(msg.getType()) {
 			case PACKET_IN:
-				OFPacketIn piMsg = (OFPacketIn) msg;
-				OFPort inPort = piMsg.getInPort();
+				// install all ip flows in advance
+				if (!isInstalled) {
+					installStaticEntries();
+					isInstalled = true;
+				}
 				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 				if (eth.getEtherType() == EthType.ARP) {
+					OFPacketIn piMsg = (OFPacketIn) msg;
+					OFPort inPort = piMsg.getMatch().get(MatchField.IN_PORT);
 					ARP arp = (ARP) eth.getPayload();
 					if (arp.getOpCode() == ArpOpcode.REQUEST){
 						logger.info ("Received ARP request in switch " + sw.getId() + " by port " + inPort);
 
-						IPv4Address sourceIPAddress = arp.getSenderProtocolAddress();
-						if (!mapCentralArpCache.containsKey(sourceIPAddress)){
+						if (!mapCentralArpCache.containsKey(arp.getSenderProtocolAddress())){
 							//get source MAC and store it in central ARP cache
-							MacAddress srcMACAddress = arp.getSenderHardwareAddress();
-							mapCentralArpCache.put(sourceIPAddress, srcMACAddress);
+							mapCentralArpCache.put(arp.getSenderProtocolAddress(), arp.getSenderHardwareAddress());
 						}
 
-						//Controller queries internal ARP cache for MAC address
-						IPv4Address dstIPAddress = arp.getTargetProtocolAddress();
-						if (mapCentralArpCache.containsKey(dstIPAddress)){
-							//if internal ARP cahce contains arp_tha, immediately inject appropriate reply
+						if (mapCentralArpCache.containsKey(arp.getTargetProtocolAddress())){
+							//if internal ARP cache contains destination MAC, immediately inject appropriate reply
 							sendARPReply(sw, inPort, arp);
 						} else {
-							//otherwise redirects the ARP request to the target host and save the reply
-							//to its internal ARP cache, before injecting reply
-							forwardMessage(eth);
+							//otherwise redirects the ARP request to the target host
+							forwardMessage(eth, "ARP request");
 						}
 
 					} else if (arp.getOpCode() == ArpOpcode.REPLY){
-						//MacAddress sourceMACAddress = arp.getSenderHardwareAddress();
-						forwardMessage(eth);
+						logger.info ("Received ARP reply in switch " + sw.getId() + " by port " + inPort);
+						//save the reply to its internal ARP cache, before injecting reply
+						mapCentralArpCache.put(arp.getSenderProtocolAddress(), arp.getSenderHardwareAddress());
+						forwardMessage(eth, "ARP reply");
 					}
-				}else if (eth.getEtherType() == EthType.IPv4) {
-					installStaticEntries();
 				}
-		default:
-			break;
+			default:
+				break;
 		}
-		return null;
+		return Command.CONTINUE;
 	}
 
-	// TODO: finish ARP reply
+	// DONE: finish ARP reply
 	public void sendARPReply(IOFSwitch sw, OFPort inPort, ARP arpRequest){
+		logger.info ("Destination MAC address exists, directly send ARP reply to switch " + sw.getId() + " on port " + inPort);
 		// Create an ARP reply frame (from target (source) to source (destination)).
 		IPacket arpReply = new Ethernet()
 				.setSourceMACAddress(mapCentralArpCache.get(arpRequest.getTargetProtocolAddress()))
@@ -138,9 +134,6 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 						.setTargetProtocolAddress(arpRequest.getSenderProtocolAddress())
 						.setPayload(new Data(new byte[] {0x01})));
 		// Send ARP reply.
-		//sendPOMessage(arpReply, floodlightProvider.getSwitch(arpRequest.getSwitchId()), arpRequest.getInPort());
-
-
 		byte[] serializedData = arpReply.serialize();
 		OFPacketOut po = sw.getOFFactory().buildPacketOut()
 				.setData(serializedData)
@@ -149,92 +142,132 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 				.build();
 		sw.write(po);
 	}
-	
-	// TODO: finish this method
-	public void forwardMessage(Ethernet eth){
+
+	// DONE: finish this method
+	public void forwardMessage(Ethernet eth, String arpOpcode){
+		//Get corresponding switch and outport to forward the ARP request/reply
 		ARP arp = (ARP) eth.getPayload();
-		IPv4Address targetIPAddress = arp.getTargetProtocolAddress();
-		
-		//OFPort outPort =
+		IPv4Address dstIPAddress = arp.getTargetProtocolAddress();
+		DatapathId switchId = mapHostToSwitch.get(dstIPAddress);
+		Map<IPv4Address, OFPort> routingTable = mapRoutingTables.get(switchId);
+		OFPort outPort = routingTable.get(dstIPAddress);
+
+		//Compose the Packet-out message and send it out
+		byte[] serializedData = eth.serialize();
+		IOFSwitch sw = switchService.getSwitch(switchId);
+		OFPacketOut po = sw.getOFFactory().buildPacketOut()
+				.setData(serializedData)
+				.setActions(Collections.singletonList((OFAction) sw.getOFFactory().actions().output(outPort,0xffFFffFF)))
+				.setInPort(OFPort.CONTROLLER)
+				.build();
+		sw.write(po);
+		logger.info ("forward " + arpOpcode + " to switch " + switchId + " on port " + outPort);
+
 	}
 
 	public void installStaticEntries(){
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
-		for(IPv4AddressWithMask ipv4AddressWithMask : routingTableS1.keySet()){
-			OFPort outPort = routingTableS1.get(ipv4AddressWithMask);
-			//set match field
-			Match match = myFactory.buildMatch()
-					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-					.setMasked(MatchField.IPV4_DST, ipv4AddressWithMask)
-					.build();
-			//set actions
-			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
-			OFActions actions = myFactory.actions();
-			OFActionOutput outputPort1 = actions.buildOutput()
-					.setMaxLen(0xFFffFFff)
-					.setPort(outPort)
-					.build();
-			actionList.add(outputPort1);
-			//add flow entry
-			OFFlowAdd flowAdd = myFactory.buildFlowAdd()
-					.setPriority(1)
-					.setMatch(match)
-					.setActions(actionList)
-					.build();
-			switchService.getSwitch(DatapathId.of(1)).write(flowAdd);
+		// install static entries for each switch
+		for(DatapathId switchId : mapRoutingTables.keySet()) {
+			logger.info ("install flow entries in switch " + switchId.toString());
+			Map<IPv4Address, OFPort> routingTable = mapRoutingTables.get(switchId);
+			for(IPv4Address ipv4Address : routingTable.keySet()){
+				OFPort outPort = routingTable.get(ipv4Address);
+				//set the match field
+				Match match = myFactory.buildMatch()
+						.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+						.setExact(MatchField.IPV4_DST, ipv4Address)
+						.build();
+				//set actions
+				ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+				OFActionOutput output = myFactory.actions().buildOutput()
+						.setMaxLen(0xFFffFFff)
+						.setPort(outPort)
+						.build();
+				actionList.add(output);
+				//add a flow entry
+				OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+						.setPriority(1)
+						.setMatch(match)
+						.setActions(actionList)
+						.build();
+				switchService.getSwitch(switchId).write(flowAdd);
+			}
 		}
+
 	}
 
 	public void setRoutingTables(){
-		routingTableS1 = new HashMap<>();
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.1.1/8"), OFPort.of(1));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.1.2/8"), OFPort.of(2));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.1.3/8"), OFPort.of(3));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.0/8"), OFPort.of(4));/*
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.1/8"), OFPort.of(4));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.2/8"), OFPort.of(4));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.2.3/8"), OFPort.of(4));*/
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.0/8"), OFPort.of(4));/*
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.2/8"), OFPort.of(4));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.1/8"), OFPort.of(4));
-		routingTableS1.put(IPv4AddressWithMask.of("10.10.4.3/8"), OFPort.of(4));
-*/
-		routingTableS2 = new HashMap<>();
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.2.1/8"), OFPort.of(1));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.2.2/8"), OFPort.of(2));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.2.3/8"), OFPort.of(3));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.1.1/8"), OFPort.of(4));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.1.2/8"), OFPort.of(4));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.1.3/8"), OFPort.of(4));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.4.1/8"), OFPort.of(5));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.4.2/8"), OFPort.of(5));
-		routingTableS2.put(IPv4AddressWithMask.of("10.10.4.3/8"), OFPort.of(5));
+		//Set up the routing table for S1
+		Map<IPv4Address, OFPort> routingTableS1 = new HashMap<>();
+		routingTableS1.put(IPv4Address.of("10.10.1.1"), OFPort.of(1));
+		routingTableS1.put(IPv4Address.of("10.10.1.2"), OFPort.of(2));
+		routingTableS1.put(IPv4Address.of("10.10.1.3"), OFPort.of(3));
+		routingTableS1.put(IPv4Address.of("10.10.2.1"), OFPort.of(4));
+		routingTableS1.put(IPv4Address.of("10.10.2.2"), OFPort.of(4));
+		routingTableS1.put(IPv4Address.of("10.10.2.3"), OFPort.of(4));
+		routingTableS1.put(IPv4Address.of("10.10.4.1"), OFPort.of(4));
+		routingTableS1.put(IPv4Address.of("10.10.4.2"), OFPort.of(4));
+		routingTableS1.put(IPv4Address.of("10.10.4.3"), OFPort.of(4));
+		//Set up the routing table for S2
+		Map<IPv4Address, OFPort> routingTableS2 = new HashMap<>();
+		routingTableS2.put(IPv4Address.of("10.10.2.1"), OFPort.of(1));
+		routingTableS2.put(IPv4Address.of("10.10.2.2"), OFPort.of(2));
+		routingTableS2.put(IPv4Address.of("10.10.2.3"), OFPort.of(3));
+		routingTableS2.put(IPv4Address.of("10.10.1.1"), OFPort.of(4));
+		routingTableS2.put(IPv4Address.of("10.10.1.2"), OFPort.of(4));
+		routingTableS2.put(IPv4Address.of("10.10.1.3"), OFPort.of(4));
+		routingTableS2.put(IPv4Address.of("10.10.4.1"), OFPort.of(5));
+		routingTableS2.put(IPv4Address.of("10.10.4.2"), OFPort.of(5));
+		routingTableS2.put(IPv4Address.of("10.10.4.3"), OFPort.of(5));
+		//Set up the routing table for S3
+		Map<IPv4Address, OFPort> routingTableS3 = new HashMap<>();
+		routingTableS3.put(IPv4Address.of("10.10.1.1"), OFPort.of(1));
+		routingTableS3.put(IPv4Address.of("10.10.1.2"), OFPort.of(1));
+		routingTableS3.put(IPv4Address.of("10.10.1.3"), OFPort.of(1));
+		routingTableS3.put(IPv4Address.of("10.10.2.1"), OFPort.of(1));
+		routingTableS3.put(IPv4Address.of("10.10.2.2"), OFPort.of(1));
+		routingTableS3.put(IPv4Address.of("10.10.2.3"), OFPort.of(1));
+		routingTableS3.put(IPv4Address.of("10.10.4.1"), OFPort.of(2));
+		routingTableS3.put(IPv4Address.of("10.10.4.2"), OFPort.of(2));
+		routingTableS3.put(IPv4Address.of("10.10.4.3"), OFPort.of(2));
+		//Set up the routing table for S4
+		Map<IPv4Address, OFPort> routingTableS4 = new HashMap<>();
+		routingTableS4.put(IPv4Address.of("10.10.4.1"), OFPort.of(1));
+		routingTableS4.put(IPv4Address.of("10.10.4.2"), OFPort.of(2));
+		routingTableS4.put(IPv4Address.of("10.10.4.3"), OFPort.of(3));
+		routingTableS4.put(IPv4Address.of("10.10.1.1"), OFPort.of(4));
+		routingTableS4.put(IPv4Address.of("10.10.1.2"), OFPort.of(4));
+		routingTableS4.put(IPv4Address.of("10.10.1.3"), OFPort.of(4));
+		routingTableS4.put(IPv4Address.of("10.10.2.1"), OFPort.of(4));
+		routingTableS4.put(IPv4Address.of("10.10.2.2"), OFPort.of(4));
+		routingTableS4.put(IPv4Address.of("10.10.2.3"), OFPort.of(4));
 
-		routingTableS3 = new HashMap<>();
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.1.1/8"), OFPort.of(1));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.1.2/8"), OFPort.of(1));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.1.3/8"), OFPort.of(1));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.2.1/8"), OFPort.of(1));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.2.2/8"), OFPort.of(1));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.2.3/8"), OFPort.of(1));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.4.1/8"), OFPort.of(2));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.4.2/8"), OFPort.of(2));
-		routingTableS3.put(IPv4AddressWithMask.of("10.10.4.3/8"), OFPort.of(2));
 
-		routingTableS4 = new HashMap<>();
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.4.1/8"), OFPort.of(1));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.4.2/8"), OFPort.of(2));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.4.3/8"), OFPort.of(3));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.1.1/8"), OFPort.of(4));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.1.2/8"), OFPort.of(4));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.1.3/8"), OFPort.of(4));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.2.1/8"), OFPort.of(4));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.2.2/8"), OFPort.of(4));
-		routingTableS4.put(IPv4AddressWithMask.of("10.10.2.3/8"), OFPort.of(4));
+		mapRoutingTables = new HashMap<DatapathId, Map<IPv4Address, OFPort>>();
+		mapRoutingTables.put(DatapathId.of(1),routingTableS1);
+		mapRoutingTables.put(DatapathId.of(2),routingTableS2);
+		mapRoutingTables.put(DatapathId.of(3),routingTableS3);
+		mapRoutingTables.put(DatapathId.of(4),routingTableS4);
+
+		//Map each host to the corresponding switch
+		mapHostToSwitch = new HashMap<IPv4Address, DatapathId>();
+		mapHostToSwitch.put(IPv4Address.of("10.10.1.1"), DatapathId.of(1));
+		mapHostToSwitch.put(IPv4Address.of("10.10.1.2"), DatapathId.of(1));
+		mapHostToSwitch.put(IPv4Address.of("10.10.1.3"), DatapathId.of(1));
+		mapHostToSwitch.put(IPv4Address.of("10.10.2.1"), DatapathId.of(2));
+		mapHostToSwitch.put(IPv4Address.of("10.10.2.2"), DatapathId.of(2));
+		mapHostToSwitch.put(IPv4Address.of("10.10.2.3"), DatapathId.of(2));
+		mapHostToSwitch.put(IPv4Address.of("10.10.4.1"), DatapathId.of(4));
+		mapHostToSwitch.put(IPv4Address.of("10.10.4.2"), DatapathId.of(4));
+		mapHostToSwitch.put(IPv4Address.of("10.10.4.3"), DatapathId.of(4));
 
 	}
 
-	@Override
+
+
+
+		@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
 		// TODO Auto-generated method stub
 		return null;
@@ -248,8 +281,12 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleDependencies() {
-		// TODO Auto-generated method stub
-		return null;
+		// DONE Auto-generated method stub
+		Collection<Class<? extends IFloodlightService>> l =
+				new ArrayList<Class<? extends IFloodlightService>>();
+		l.add(IFloodlightProviderService.class);
+		l.add(IOFSwitchService.class);
+		return l;
 	}
 
 	private void setupLogger() {
@@ -258,16 +295,17 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 			FileHandler fileHandler = new FileHandler("/home/student/ex3/task31.log");
 			logger.addHandler(fileHandler);
 		} catch (Exception e) {
-	        System.out.println("Failed to configure logging to file");
-	    }
+			System.out.println("Failed to configure logging to file");
+		}
 	}
-	
+
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
 		// DONE Auto-generated method stub
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		mapCentralArpCache = new HashMap<>();
+		setRoutingTables();
 		setupLogger();
 		logger.info("Init");
 	}
