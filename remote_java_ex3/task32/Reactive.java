@@ -56,10 +56,6 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	private Map<IPv4Address, BroadcastTree> rootMstMap;
 	private Map<Link,Integer> linkCostMap;
 	
-	protected Reactive() {
-		
-	}
-	
 	@Override
 	public String getName() {
 		// DONE Auto-generated method stub
