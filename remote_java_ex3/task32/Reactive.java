@@ -3,7 +3,9 @@ package net.sdnlab.ex3.task32;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -11,7 +13,9 @@ import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 
 import org.projectfloodlight.openflow.protocol.OFMessage;
+import org.projectfloodlight.openflow.protocol.OFPacketOut;
 import org.projectfloodlight.openflow.protocol.OFType;
+import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.IPv4Address;
 import org.projectfloodlight.openflow.types.OFPort;
@@ -50,10 +54,10 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 
 	private Set<DatapathId> dpidSet;
 	private Map<DatapathId, Set<Link>> switchLinkMap;
-	// to look up host with its connecting switch and port
-	private Map<IPv4Address, Pair<DatapathId, OFPort>> edgeSwitchMap;
+	// to look up host ip with its connecting edge switch dpid and port
+	private Map<IPv4Address, Pair<DatapathId, OFPort>> hostEdgeSwitchMap;
 	// to look up shortest path wtih root Minimum spanning tree of that root
-	private Map<IPv4Address, BroadcastTree> rootMstMap;
+	private Map<DatapathId, BroadcastTree> rootMstMap;
 	private Map<Link,Integer> linkCostMap;
 	
 	@Override
@@ -78,6 +82,23 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		return (link.getSrc().equals(src)) ? link.getDst() : link.getSrc();
 	}
 
+	private void injectMessage(Ethernet eth, String arpOpcode) {
+		IPv4 ipv4 = (IPv4) eth.getPayload();
+		IPv4Address dstAddress = ipv4.getDestinationAddress();
+		Pair<DatapathId, OFPort> pair = hostEdgeSwitchMap.get(dstAddress);
+		DatapathId dstDpid = pair.getKey();
+		OFPort dstPort = pair.getValue();
+		IOFSwitch dstSw = switchService.getSwitch(dstDpid);
+		byte[] serializedData = eth.serialize();
+
+		OFPacketOut po = dstSw.getOFFactory().buildPacketOut()
+				.setData(serializedData)
+				.setActions(Collections.singletonList((OFAction) dstSw.getOFFactory().actions().output(dstPort, 0xffFFffFF)))
+				.setInPort(OFPort.CONTROLLER)
+				.build();
+		dstSw.write(po);
+	}
+
 	@Override
 	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		// TODO Auto-generated method stub
@@ -87,10 +108,15 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 				IPv4 ipv4Pkt= (IPv4) eth.getPayload();
 				IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
-				if (!rootMstMap.containsKey(srcAddr)) {
-					calShortestPath(srcAddr);
-					createFlow(srcAddr);
-					installFlow(srcAddr);
+				IPv4Address dstAddr = ipv4Pkt.getDestinationAddress();
+				// retriving the dpid of source switch
+				DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
+				DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
+				if (!rootMstMap.containsKey(srcDpid)) {
+					calShortestPath(srcDpid);
+					List<Link> linkList = createFlow(srcDpid, dstDpid);
+					installFlow(srcDpid);
+					injectMessage(eth, "Forward Message");
 				}
 				break;
 			default:
@@ -202,18 +228,27 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		}
 	}
 
-	// TODO: STEP-2: calculate shortest path: using dijkstra
-	private void calShortestPath(IPv4Address srcAddr) {
-
+	// DONE: STEP-2: calculate shortest path: using dijkstra
+	private void calShortestPath(DatapathId srcDpid) {
+		linkCostMap = initLinkCostMap(HOPCOUNT, switchLinkMap);
+		BroadcastTree broadcastTree = dijkstra(srcDpid, switchLinkMap, linkCostMap);
+		rootMstMap.put(srcDpid, broadcastTree);
 	}
 
-	// TODO: STEP-3: ceate flow
-	private void createFlow(IPv4Address srcAddr) {
-
+	// DONE: STEP-3: ceate flow
+	private List<Link> createFlow(DatapathId src, DatapathId dst) {
+		List<Link> list = new ArrayList<>();
+		BroadcastTree mst = rootMstMap.get(src);
+		DatapathId next = dst;
+		while (!next.equals(src)) {
+			list.add(mst.getLinks().get(next));
+			next = getLinkOtherEnd(next, mst.getLinks().get(next));
+		}
+		return list;
 	}
 
 	// TODO: STEP-4: install flow when PACKET_IN event (reactivly)
-	private void installFlow(IPv4Address srcAddr) {
+	private void installFlow(DatapathId srcDpid) {
 
 	}
 
@@ -477,14 +512,14 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 
 	public void setRoutingTables() {
 		//Set up the routing table for first PACKET_IN inject
-		edgeSwitchMap = new HashMap<>();
-		edgeSwitchMap.put(IPv4Address.of("10.10.1.1"), new Pair<DatapathId, OFPort>(DatapathId.of(0x101), OFPort.of(3)));
-		edgeSwitchMap.put(IPv4Address.of("10.10.1.2"), new Pair<DatapathId, OFPort>(DatapathId.of(0x101), OFPort.of(4)));
-		edgeSwitchMap.put(IPv4Address.of("10.10.1.3"), new Pair<DatapathId, OFPort>(DatapathId.of(0x102), OFPort.of(3)));
-		edgeSwitchMap.put(IPv4Address.of("10.10.1.4"), new Pair<DatapathId, OFPort>(DatapathId.of(0x102), OFPort.of(4)));
-		edgeSwitchMap.put(IPv4Address.of("10.10.2.1"), new Pair<DatapathId, OFPort>(DatapathId.of(0x201), OFPort.of(3)));
-		edgeSwitchMap.put(IPv4Address.of("10.10.2.2"), new Pair<DatapathId, OFPort>(DatapathId.of(0x201), OFPort.of(4)));
-		edgeSwitchMap.put(IPv4Address.of("10.10.2.3"), new Pair<DatapathId, OFPort>(DatapathId.of(0x202), OFPort.of(3)));
-		edgeSwitchMap.put(IPv4Address.of("10.10.2.4"), new Pair<DatapathId, OFPort>(DatapathId.of(0x202), OFPort.of(4)));
+		hostEdgeSwitchMap = new HashMap<>();
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.1.1"), new Pair<DatapathId, OFPort>(DatapathId.of(0x101), OFPort.of(3)));
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.1.2"), new Pair<DatapathId, OFPort>(DatapathId.of(0x101), OFPort.of(4)));
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.1.3"), new Pair<DatapathId, OFPort>(DatapathId.of(0x102), OFPort.of(3)));
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.1.4"), new Pair<DatapathId, OFPort>(DatapathId.of(0x102), OFPort.of(4)));
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.2.1"), new Pair<DatapathId, OFPort>(DatapathId.of(0x201), OFPort.of(3)));
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.2.2"), new Pair<DatapathId, OFPort>(DatapathId.of(0x201), OFPort.of(4)));
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.2.3"), new Pair<DatapathId, OFPort>(DatapathId.of(0x202), OFPort.of(3)));
+		hostEdgeSwitchMap.put(IPv4Address.of("10.10.2.4"), new Pair<DatapathId, OFPort>(DatapathId.of(0x202), OFPort.of(4)));
 	}
 }

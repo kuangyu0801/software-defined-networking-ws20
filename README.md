@@ -73,4 +73,6 @@ logger.debug("Temperature set to {}. Old temperature was {}.", newT, oldT);
 - private, protected, public privilege difference
 - package and project relation
 - enumeration with java
+- https://www.itread01.com/content/1543703178.html
+    + java出現“No enclosing instance of type XXX is accessible”
 

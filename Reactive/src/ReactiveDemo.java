@@ -210,11 +210,11 @@ public class ReactiveDemo {
         return ret;
     }
     // returning all hops from dst to src, including dst
-    private static List<DatapathId> createFlow(DatapathId src, DatapathId dst, BroadcastTree mst) {
-        List<DatapathId> list = new ArrayList<>();
+    private static List<Link> createFlow(DatapathId src, DatapathId dst, BroadcastTree mst) {
+        List<Link> list = new ArrayList<>();
         DatapathId next = dst;
         while (!next.equals(src)) {
-            list.add(next);
+            list.add(mst.links.get(next));
             next = getLinkOtherEnd(next, mst.links.get(next));
         }
         return list;
@@ -289,6 +289,7 @@ public class ReactiveDemo {
         Map<Link, Integer> linkCost = initLinkCostMap(HOPCOUNT, mapLinks);
         // find shortest path tree for switch 101
         BroadcastTree broadcastTree = dijkstra(dpid101, mapLinks,linkCost);
+        System.out.println("Minimum Spanning Tree for "+ String.format("%03d", dpid101.getLong()) );
         System.out.println("| Node | Cost |    Link    |");
         System.out.println("| ---- | ---- | ---------- |");
         for (DatapathId dpid : broadcastTree.links.keySet()) {
@@ -302,12 +303,11 @@ public class ReactiveDemo {
         // find shortest path from 101 to all other node
         for (DatapathId dst : dpidArr) {
             if (!dst.equals(dpid101)) {
-                System.out.println("To " + String.format("%03d", dst.getLong()));
-                List<DatapathId> listDatapathIds = createFlow(dpid101, dst, broadcastTree);
-                for (DatapathId dpid : listDatapathIds) {
-                    System.out.print(String.format("%03d", dpid.getLong()) + "---");
+                System.out.println(String.format("%03d", dpid101.getLong()) + " to " + String.format("%03d", dst.getLong()));
+                List<Link> linkList = createFlow(dpid101, dst, broadcastTree);
+                for (Link link : linkList) {
+                    System.out.println(String.format("%03d", link.src.getLong()) + "---" + String.format("%03d", link.dst.getLong()));
                 }
-                System.out.println(String.format("%03d", dpid101.getLong()));
             }
         }
     }
