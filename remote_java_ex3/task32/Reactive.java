@@ -17,6 +17,7 @@ import org.projectfloodlight.openflow.protocol.OFPacketOut;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.EthType;
 import org.projectfloodlight.openflow.types.IPv4Address;
 import org.projectfloodlight.openflow.types.OFPort;
 
@@ -52,6 +53,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	protected IOFSwitchService switchService;
 	protected ILinkDiscoveryService linkDiscoverer;
 
+	private boolean isGraphCreated;
 	private Set<DatapathId> dpidSet;
 	private Map<DatapathId, Set<Link>> switchLinkMap;
 	// to look up host ip with its connecting edge switch dpid and port
@@ -102,20 +104,31 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	@Override
 	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		// TODO Auto-generated method stub
-		// Inject the first packet directly at the target switch
+		// create graph in receive(), because this is a "rather" steady static
+		if (!isGraphCreated) {
+			createNetworkGraph();
+			isGraphCreated = true;
+		}
+
 		switch(msg.getType()) {
 			case PACKET_IN:
 				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-				IPv4 ipv4Pkt= (IPv4) eth.getPayload();
-				IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
-				IPv4Address dstAddr = ipv4Pkt.getDestinationAddress();
-				// retriving the dpid of source switch
-				DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
-				DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
-				if (!rootMstMap.containsKey(srcDpid)) {
-					calShortestPath(srcDpid);
-					List<Link> linkList = createFlow(srcDpid, dstDpid);
-					installFlow(srcDpid);
+				if (eth.getEtherType() == EthType.IPv4) {
+					IPv4 ipv4Pkt = (IPv4) eth.getPayload();
+					IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
+					IPv4Address dstAddr = ipv4Pkt.getDestinationAddress();
+					// retriving the dpid of source switch
+					DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
+					DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
+
+					// mst has not be calculated
+					if (!rootMstMap.containsKey(srcDpid)) {
+						calShortestPath(srcDpid);
+					}
+
+					List<Link> linkList = findFlow(srcDpid, dstDpid);
+					installFlow(srcAddr, dstAddr, linkList);
+					// Inject the first packet directly at the target switch
 					injectMessage(eth, "Forward Message");
 				}
 				break;
@@ -165,6 +178,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		linkDiscoverer = context.getServiceImpl(ILinkDiscoveryService.class);
 		setupLogger();
+		isGraphCreated = false;
 		logger.info("Init");
 	}
 
@@ -180,7 +194,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 
 	private void enableReactiveRouting() {
 		// STEP-1: link state detection: create directed graph for djikstra
-		createNetworkGraph();
+
 		// TODO: STEP-2: calculate shortest path: using dijkstra
 
 		// TODO: STEP-3: create flow
@@ -236,19 +250,22 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	}
 
 	// DONE: STEP-3: ceate flow
-	private List<Link> createFlow(DatapathId src, DatapathId dst) {
+	// return the shortest route from src to dst
+	private List<Link> findFlow(DatapathId src, DatapathId dst) {
 		List<Link> list = new ArrayList<>();
 		BroadcastTree mst = rootMstMap.get(src);
+		// trace backward for the mst
 		DatapathId next = dst;
 		while (!next.equals(src)) {
-			list.add(mst.getLinks().get(next));
-			next = getLinkOtherEnd(next, mst.getLinks().get(next));
+			Link link = mst.getLinks().get(next);
+			list.add(link);
+			next = link.getDst();
 		}
 		return list;
 	}
 
 	// TODO: STEP-4: install flow when PACKET_IN event (reactivly)
-	private void installFlow(DatapathId srcDpid) {
+	private void installFlow(IPv4Address srcAddr, IPv4Address dstAddr, List<Link> list) {
 
 	}
 
