@@ -36,10 +36,13 @@ import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
+import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
+import net.floodlightcontroller.linkdiscovery.Link;
 import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPacket;
+import net.floodlightcontroller.packet.IPv4;
 
 public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 
@@ -51,6 +54,8 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 	private Map<IPv4Address, MacAddress> mapCentralArpCache;
 	private Map<DatapathId, Map<IPv4Address, OFPort>> mapRoutingTables;
 	private Map<IPv4Address, DatapathId> mapHostToSwitch;
+	
+	protected ILinkDiscoveryService linkDiscoverer;
 
 	@Override
 	public String getName() {
@@ -76,10 +81,16 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		switch(msg.getType()) {
 			case PACKET_IN:
 				// install all ip flows in advance
-				if (!isInstalled) {
-					installStaticEntries();
-					isInstalled = true;
-				}
+//				if (!isInstalled) {					
+//					for (DatapathId dpid : switchService.getAllSwitchDpids()) {
+//						logger.info("Links of switch" + dpid.toString());
+//						for (Link link : linkDiscoverer.getSwitchLinks().get(dpid)) {
+//							logger.info(link.toString());
+//						}
+//					}
+//					isInstalled = true;
+//				}
+				
 				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 				if (eth.getEtherType() == EthType.ARP) {
 					OFPacketIn piMsg = (OFPacketIn) msg;
@@ -89,7 +100,7 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 						logger.info ("Received ARP request in switch " + sw.getId() + " by port " + inPort);
 
 						if (!mapCentralArpCache.containsKey(arp.getSenderProtocolAddress())){
-							//get source MAC and store it in central ARP cache
+							//if source MAC has not been seen then store it in central ARP cache
 							mapCentralArpCache.put(arp.getSenderProtocolAddress(), arp.getSenderHardwareAddress());
 						}
 
@@ -107,6 +118,23 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 						mapCentralArpCache.put(arp.getSenderProtocolAddress(), arp.getSenderHardwareAddress());
 						forwardMessage(eth, "ARP reply");
 					}
+				} else if (eth.getEtherType() == EthType.IPv4) {
+					logger.info ("Received dropped IPv4 packet");
+					installStaticEntries();
+					
+					IPv4 ipv4 = (IPv4) eth.getPayload();
+					IPv4Address dstAddress = ipv4.getDestinationAddress();
+					DatapathId dstDpid = mapHostToSwitch.get(dstAddress);
+					OFPort dstPort = mapRoutingTables.get(dstDpid).get(dstAddress);
+					IOFSwitch dstSw = switchService.getSwitch(dstDpid);		
+					byte[] serializedData = eth.serialize();
+					
+					OFPacketOut po = dstSw.getOFFactory().buildPacketOut()
+							.setData(serializedData)
+							.setActions(Collections.singletonList((OFAction) dstSw.getOFFactory().actions().output(dstPort, 0xffFFffFF)))
+							.setInPort(OFPort.CONTROLLER)
+							.build();
+					dstSw.write(po);
 				}
 			default:
 				break;
@@ -286,6 +314,7 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 				new ArrayList<Class<? extends IFloodlightService>>();
 		l.add(IFloodlightProviderService.class);
 		l.add(IOFSwitchService.class);
+		l.add(ILinkDiscoveryService.class);
 		return l;
 	}
 
@@ -308,6 +337,7 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 		setRoutingTables();
 		setupLogger();
 		logger.info("Init");
+		linkDiscoverer = context.getServiceImpl(ILinkDiscoveryService.class);
 	}
 
 	@Override
