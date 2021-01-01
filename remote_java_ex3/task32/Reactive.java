@@ -12,10 +12,17 @@ import java.util.Set;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 
+import org.projectfloodlight.openflow.protocol.OFFactories;
+import org.projectfloodlight.openflow.protocol.OFFactory;
+import org.projectfloodlight.openflow.protocol.OFFlowAdd;
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFPacketOut;
 import org.projectfloodlight.openflow.protocol.OFType;
+import org.projectfloodlight.openflow.protocol.OFVersion;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
+import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.match.Match;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.EthType;
 import org.projectfloodlight.openflow.types.IPv4Address;
@@ -266,7 +273,32 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 
 	// TODO: STEP-4: install flow when PACKET_IN event (reactivly)
 	private void installFlow(IPv4Address srcAddr, IPv4Address dstAddr, List<Link> list) {
-
+		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
+		// install all links one by one
+		for (Link link : list) {
+			OFPort srcOFPort = link.getSrcPort();
+			DatapathId srcDpid = link.getSrc();
+			// set the match field of destination IP
+			Match match = myFactory.buildMatch()
+					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+					.setExact(MatchField.IPV4_DST, dstAddr)
+					.build();
+			// set actions of output flow of src output
+			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+			OFActionOutput output = myFactory.actions().buildOutput()
+					.setMaxLen(0xFFffFFff)
+					.setPort(srcOFPort)
+					.build();
+			actionList.add(output);
+			//add a flow entry
+			OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+					.setPriority(1)
+					.setMatch(match)
+					.setActions(actionList)
+					.build();
+			// set src switch
+			switchService.getSwitch(srcDpid).write(flowAdd);
+		}
 	}
 
 	/*
