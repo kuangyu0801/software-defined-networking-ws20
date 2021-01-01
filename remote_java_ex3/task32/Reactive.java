@@ -113,6 +113,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		// TODO Auto-generated method stub
 		// create graph in receive(), because this is a "rather" steady static
 		if (!isGraphCreated) {
+			initHostEdgeSwitch();
+			installEdgeSwitchToHost();
 			createNetworkGraph();
 			isGraphCreated = true;
 		}
@@ -124,7 +126,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 					IPv4 ipv4Pkt = (IPv4) eth.getPayload();
 					IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
 					IPv4Address dstAddr = ipv4Pkt.getDestinationAddress();
-					// retriving the dpid of source switch
+					// retrieving the dpid of source switch
 					DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
 					DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
 
@@ -194,21 +196,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		// DONE Auto-generated method stub
 		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
 		logger.info("Start Up");
-		enableReactiveRouting();
-		setRoutingTables();
+
 		logger.info("Start Up End");
-	}
-
-	private void enableReactiveRouting() {
-		// STEP-1: link state detection: create directed graph for djikstra
-
-		// TODO: STEP-2: calculate shortest path: using dijkstra
-
-		// TODO: STEP-3: create flow
-
-		// TODO: STEP-4: install flow (when PACKET_IN ? or install right away
-
-		// TODO: verification with ping and routetrace
 	}
 
 	// DONE: STEP-1: link state detection: create directed graph for djikstra
@@ -256,7 +245,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		rootMstMap.put(srcDpid, broadcastTree);
 	}
 
-	// DONE: STEP-3: ceate flow
+	// DONE: STEP-3: create flow
 	// return the shortest route from src to dst
 	private List<Link> findFlow(DatapathId src, DatapathId dst) {
 		List<Link> list = new ArrayList<>();
@@ -271,33 +260,42 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		return list;
 	}
 
+	private void installOnSwitch(IPv4Address dstAddr, DatapathId srcDpid, OFPort srcOFPort) {
+		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
+		// set the match field of destination IP
+		Match match = myFactory.buildMatch()
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IPV4_DST, dstAddr)
+				.build();
+		// set actions of output flow of src output
+		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+		OFActionOutput output = myFactory.actions().buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(srcOFPort)
+				.build();
+		actionList.add(output);
+		//add a flow entry
+		OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setMatch(match)
+				.setActions(actionList)
+				.build();
+		// set src switch
+		switchService.getSwitch(srcDpid).write(flowAdd);
+	}
+
 	// TODO: STEP-4: install flow when PACKET_IN event (reactivly)
 	private void installFlow(IPv4Address srcAddr, IPv4Address dstAddr, List<Link> list) {
-		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
 		// install all links one by one
 		for (Link link : list) {
-			OFPort srcOFPort = link.getSrcPort();
-			DatapathId srcDpid = link.getSrc();
-			// set the match field of destination IP
-			Match match = myFactory.buildMatch()
-					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-					.setExact(MatchField.IPV4_DST, dstAddr)
-					.build();
-			// set actions of output flow of src output
-			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
-			OFActionOutput output = myFactory.actions().buildOutput()
-					.setMaxLen(0xFFffFFff)
-					.setPort(srcOFPort)
-					.build();
-			actionList.add(output);
-			//add a flow entry
-			OFFlowAdd flowAdd = myFactory.buildFlowAdd()
-					.setPriority(1)
-					.setMatch(match)
-					.setActions(actionList)
-					.build();
-			// set src switch
-			switchService.getSwitch(srcDpid).write(flowAdd);
+			installOnSwitch(dstAddr, link.getSrc(), link.getSrcPort());
+		}
+	}
+
+	private void installEdgeSwitchToHost() {
+		for (IPv4Address hostAddr : hostEdgeSwitchMap.keySet()) {
+			Pair<DatapathId, OFPort> pair = hostEdgeSwitchMap.get(hostAddr);
+			installOnSwitch(hostAddr, pair.getKey(), pair.getValue());
 		}
 	}
 
@@ -522,8 +520,14 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 				continue;
 			}
 
+			// link is directional and {key = s1 : value {(s1-s2), (s2-s1)}
 			for (Link link : links.get(curDpid)) {
-				DatapathId neighbor = getLinkOtherEnd(curDpid, link);
+				DatapathId neighbor = link.getDst();
+
+				// ignore current swith is destination of link
+				if (neighbor.equals(curDpid)) {
+					continue;
+				}
 
 				if (seen.containsKey(neighbor)) {
 					continue;
@@ -559,7 +563,8 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		return ret;
 	}
 
-	public void setRoutingTables() {
+	// hard code associate all the host with their ingress switch
+	public void initHostEdgeSwitch() {
 		//Set up the routing table for first PACKET_IN inject
 		hostEdgeSwitchMap = new HashMap<>();
 		hostEdgeSwitchMap.put(IPv4Address.of("10.10.1.1"), new Pair<DatapathId, OFPort>(DatapathId.of(0x101), OFPort.of(3)));
