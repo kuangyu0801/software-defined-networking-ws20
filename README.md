@@ -15,7 +15,8 @@ sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/task14topo.py
     - [TODO] install flow
     - [TODO] (test with trace route)
     - [TODO] write python parsing script for xml
-
+- Optimization
+    - identifty and avoid duplicate install flow
 - layer 3 match
 - the shortest path
     + hop as weight
@@ -39,7 +40,8 @@ sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/task14topo.py
     + getAllSwitchDpids()
 - Interface ILinkDiscoveryService http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/linkdiscovery/ILinkDiscoveryService.html
     + getSwitchLinks()
-- IOFSwitch http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/core/IOFSwitch.html    
+- IOFSwitch http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/core/IOFSwitch.html
+    
 ```
 sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/fattree.py --topo fattree --arp
 ```
@@ -62,6 +64,8 @@ ssh sdnfp04_proxy
 sshfs sdnfp04_proxy:/home/student/ex3 remote_sshfs_ex3
 
 sshfs sdnfp04_proxy:/opt/floodlight/src/main/java/net/sdnlab/ex3 remote_java_ex3
+
+sudo reboot
 ```
 
 # Logger
@@ -75,4 +79,5 @@ logger.debug("Temperature set to {}. Old temperature was {}.", newT, oldT);
 - enumeration with java
 - https://www.itread01.com/content/1543703178.html
     + java出現“No enclosing instance of type XXX is accessible”
+- https://www.cyberciti.biz/faq/howto-reboot-linux/
 
