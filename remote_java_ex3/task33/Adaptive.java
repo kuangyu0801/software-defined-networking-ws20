@@ -74,7 +74,8 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	// to look up host ip with its connecting edge switch dpid and port
 	private Map<IPv4Address, Pair<DatapathId, OFPort>> hostEdgeSwitchMap;
 	// to look up shortest path with root Minimum spanning tree of that root
-	private Map<DatapathId, BroadcastTree> rootMstMap = new HashMap<>();;
+	// consider both layer-3 and layer-4 match
+	private Map<DatapathId, Map<TransportPort, BroadcastTree>> rootMstMap = new HashMap<>();
 	private Map<Link,Integer> linkCostMap;
 
 	@Override
@@ -178,19 +179,22 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	}
 
 	// DONE: STEP-2: calculate shortest path: using dijkstra
-	private void calShortestPath(DatapathId srcDpid, int costType) {
+	private void calShortestPath(DatapathId srcDpid, int costType, TransportPort dstPort) {
 		logger.info("calculated shortest path with switch: " + srcDpid.toString());
 		linkCostMap = initLinkCostMap(costType, switchPortLinkMap);
 		BroadcastTree broadcastTree = dijkstra(srcDpid, switchLinkMap, linkCostMap);
-		rootMstMap.put(srcDpid, broadcastTree);
+		HashMap<TransportPort, BroadcastTree> transportMap = (HashMap<TransportPort, BroadcastTree>) 
+				rootMstMap.getOrDefault(srcDpid, new HashMap());
+		transportMap.put(dstPort, broadcastTree);
+		rootMstMap.putIfAbsent(srcDpid, transportMap);
 	}
 
 	// DONE: STEP-3: create flow
 	// return the shortest route from src to dst
-	private List<Link> findFlow(DatapathId src, DatapathId dst) {
-		logger.info("find flow for src: " + src.toString() + " dst: " + dst.toString());
+	private List<Link> findFlow(DatapathId src, DatapathId dst, TransportPort dstPort) {
+		logger.info("find flow for src: " + src.toString() + " dst: " + dst.toString() + " dstPort: " + dstPort.toString());
 		List<Link> list = new ArrayList<>();
-		BroadcastTree mst = rootMstMap.get(src);
+		BroadcastTree mst = rootMstMap.get(src).get(dstPort);
 		// trace backward for the mst
 		DatapathId next = dst;
 		while (!next.equals(src)) {
@@ -199,6 +203,32 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 			next = link.getSrc();
 		}
 		return list;
+	}
+
+	private void installOnSwitch(IPv4Address dstAddr, DatapathId srcDpid, OFPort srcOFPort, TransportPort dstPort) {
+		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
+		// set the match field of destination IP
+		Match match = myFactory.buildMatch()
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setExact(MatchField.IPV4_DST, dstAddr)
+				.setExact(MatchField.IP_PROTO, IpProtocol.TCP)
+				.setExact(MatchField.TCP_DST, dstPort)
+				.build();
+		// set actions of output flow of src output
+		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+		OFActionOutput output = myFactory.actions().buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(srcOFPort)
+				.build();
+		actionList.add(output);
+		//add a flow entry
+		OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+				.setPriority(1)
+				.setMatch(match)
+				.setActions(actionList)
+				.build();
+		// set src switch
+		switchService.getSwitch(srcDpid).write(flowAdd);
 	}
 
 	private void installOnSwitch(IPv4Address dstAddr, DatapathId srcDpid, OFPort srcOFPort) {
@@ -226,12 +256,12 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	}
 
 	// DONE: STEP-4: install flow when PACKET_IN event (reactivly)
-	private void installFlow(IPv4Address srcAddr, IPv4Address dstAddr, List<Link> list) {
+	private void installFlow(IPv4Address srcAddr, IPv4Address dstAddr, List<Link> list, TransportPort dstPort) {
 		// install all links one by one
 		logger.info("Install flow src: " + srcAddr.toString() + " dst: " + dstAddr.toString());
 		for (Link link : list) {
 			logger.info("link src: " + link.getSrc().toString() + " dst: " + link.getDst().toString());
-			installOnSwitch(dstAddr, link.getSrc(), link.getSrcPort());
+			installOnSwitch(dstAddr, link.getSrc(), link.getSrcPort(), dstPort);
 		}
 	}
 
@@ -575,11 +605,6 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 					DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
 					DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
 
-					// mst has not be calculated
-					if (!rootMstMap.containsKey(srcDpid)) {
-						calShortestPath(srcDpid, HOPCOUNT);
-					}
-
 					// Recalculate for dynamic path for TCP transmission
 					// DONE: set update period 10s in .property LN66
 					if (ipv4Pkt.getProtocol() == IpProtocol.TCP) {
@@ -587,16 +612,16 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 						TransportPort srcPort = tcp.getSourcePort();
 						TransportPort dstPort = tcp.getDestinationPort();
 
-						logger.info("PACKET_IN message from switch: "
-								+ sw.getId().toString() + " TCP source port: " + srcPort
+						logger.info("PACKET_IN message from switch: " + sw.getId().toString() 
+								+ " TCP source port: " + srcPort
 								+ " TCP destination port: " + dstPort);
-						calShortestPath(srcDpid, BANDWIDTH);
+						calShortestPath(srcDpid, BANDWIDTH, dstPort);
+				
+						// find the required path
+						List<Link> linkList = findFlow(srcDpid, dstDpid, dstPort);
+						// install entries in switches along the path
+						installFlow(srcAddr, dstAddr, linkList, dstPort);
 					}
-
-					// find the required path
-					List<Link> linkList = findFlow(srcDpid, dstDpid);
-					// install entries in switches along the path
-					installFlow(srcAddr, dstAddr, linkList);
 					// Inject the first packet directly at the target switch
 					injectMessage(eth, "Forward Message");
 				}

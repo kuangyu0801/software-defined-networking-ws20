@@ -63,6 +63,8 @@ iperf -f k -s -p 5001, -P %d" % nIperfs
 
 ```
 
+這邊的iperf是multi-thread, 有不同的client port, 所以要使用pair key
+
 # Frequently Used Command
 - 改用java native library 
     + https://codebeautify.org/
