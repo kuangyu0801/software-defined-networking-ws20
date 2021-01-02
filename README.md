@@ -52,6 +52,17 @@ sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/fattree.py --
 # 3.3 – Adaptive Link Load Balancing
 
 - link weight should be proportional to utilization
+- iperf: https://linux.die.net/man/1/iperf
+
+```
+// server
+// format in Kbits, server, port on 5001, parallel tranmission
+iperf -f k -s -p 5001, -P %d" % nIperfs
+
+// client
+
+```
+
 # Frequently Used Command
 - 改用java native library 
     + https://codebeautify.org/
