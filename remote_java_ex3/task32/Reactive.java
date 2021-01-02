@@ -101,53 +101,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		dstSw.write(po);
 	}
 
-	@Override
-	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
-		// TODO Auto-generated method stub
-		// create graph in receive(), because this is a "rather" steady static
-		if (!isGraphCreated) {
-			initHostEdgeSwitch();
-			installEdgeSwitchToHost();
-			createNetworkGraph();
-			isGraphCreated = true;
-		}
-		//logger.info("receive() callback is invokedp1");
-		switch(msg.getType()) {
-			case PACKET_IN:
-				//logger.info("PACKET_IN event happened");
-				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-				if (eth.getEtherType() == EthType.IPv4) {
-					logger.info("IP packet received");
-					IPv4 ipv4Pkt = (IPv4) eth.getPayload();
-					IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
-					IPv4Address dstAddr = ipv4Pkt.getDestinationAddress();
-					// retrieving the dpid of source switch
-					logger.info("src ip: " + srcAddr.toString());
-					logger.info("dst ip: " + dstAddr.toString());
-					if (hostEdgeSwitchMap.containsKey(srcAddr)) {
-						logger.info("hostEdgeSwitchMap has key");
-					} else {
-						logger.info("no key is found");
-					}
-					DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
-					DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
 
-					// mst has not be calculated
-					if (!rootMstMap.containsKey(srcDpid)) {
-						calShortestPath(srcDpid);
-					}
-
-					List<Link> linkList = findFlow(srcDpid, dstDpid);
-					installFlow(srcAddr, dstAddr, linkList);
-					// Inject the first packet directly at the target switch
-					injectMessage(eth, "Forward Message");
-				}
-				break;
-			default:
-				break;
-		}
-		return Command.CONTINUE;
-	}
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -182,55 +136,22 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 	    }
 	}
 	
-	@Override
-	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
-		// DONE Auto-generated method stub
-		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
-		switchService = context.getServiceImpl(IOFSwitchService.class);
-		linkDiscoverer = context.getServiceImpl(ILinkDiscoveryService.class);
-		setupLogger();
-		isGraphCreated = false;
-		logger.info("Init");
-	}
 
-	@Override
-	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-		// DONE Auto-generated method stub
-		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
-		logger.info("Start Up");
-
-		logger.info("Start Up End");
-	}
 
 	// DONE: STEP-1: link state detection: create directed graph for djikstra
 	private void createNetworkGraph() {
 		logger.info("Get all DatapathID");
 		dpidSet = switchService.getAllSwitchDpids();
-
-		// TODO: find out a way to avoid this part
-		// wait until all the switches has been add to network
-/*		while (dpidSet.size() < 10) {
-			dpidSet = switchService.getAllSwitchDpids();
-		}*/
-
 		logger.info("Total switch number: " + dpidSet.size());
-		logger.info("Printing all DatapathID ");
+		logger.info("Getting switch-link map ");
 		switchLinkMap = linkDiscoverer.getSwitchLinks();
+		logger.info("Current switch links map size: " + switchLinkMap.size());
+
 		/*
 		for (DatapathId dpid: dpidSet) {
 			logger.info(dpid.toString());
 		}
 
-		logger.info("Getting switch-link map ");
-
-		while (switchLinkMap.size() < 10) {
-			switchLinkMap = linkDiscoverer.getSwitchLinks();
-			logger.info("Current switch links map size: " + switchLinkMap.size());
-		}
-
-		logger.info("Get all links");
-
-		// TODO: remove this method to a more steady state
 		for (DatapathId dpid : dpidSet) {
 			logger.info("Links of switch: " + dpid.toString());
 			switchLinkMap.containsKey(dpid);
@@ -289,11 +210,12 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		switchService.getSwitch(srcDpid).write(flowAdd);
 	}
 
-	// TODO: STEP-4: install flow when PACKET_IN event (reactivly)
+	// DONE: STEP-4: install flow when PACKET_IN event (reactivly)
 	private void installFlow(IPv4Address srcAddr, IPv4Address dstAddr, List<Link> list) {
 		// install all links one by one
 		logger.info("Install flow src: " + srcAddr.toString() + " dst: " + dstAddr.toString());
 		for (Link link : list) {
+			logger.info("link src: " + link.getSrc().toString() + " dst: " + link.getDst().toString());
 			installOnSwitch(dstAddr, link.getSrc(), link.getSrcPort());
 		}
 	}
@@ -423,13 +345,6 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 
 			default:
 				logger.info("Invalid Selection: Using Default Hop Count with Tunnel Bias for Metrics");
-/*				for (NodePortTuple npt : portsTunnel) {
-					if (links.get(npt) == null) continue;
-					for (Link link : links.get(npt)) {
-						if (link == null) continue;
-						linkCost.put(link, tunnel_weight);
-					}
-				}*/
 				return linkCost;
 		}
 	}
@@ -586,5 +501,73 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		for (IPv4Address addr : hostEdgeSwitchMap.keySet()) {
 			logger.info(addr.toString());
 		}
+	}
+
+	@Override
+	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
+		// TODO Auto-generated method stub
+		// create graph in receive(), because this is a "rather" steady static
+		if (!isGraphCreated) {
+			initHostEdgeSwitch();
+			installEdgeSwitchToHost();
+			createNetworkGraph();
+			isGraphCreated = true;
+		}
+		//logger.info("receive() callback is invokedp1");
+		switch(msg.getType()) {
+			case PACKET_IN:
+				//logger.info("PACKET_IN event happened");
+				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+				if (eth.getEtherType() == EthType.IPv4) {
+					logger.info("IP packet received");
+					IPv4 ipv4Pkt = (IPv4) eth.getPayload();
+					IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
+					IPv4Address dstAddr = ipv4Pkt.getDestinationAddress();
+					// retrieving the dpid of source switch
+					logger.info("src ip: " + srcAddr.toString());
+					logger.info("dst ip: " + dstAddr.toString());
+					if (hostEdgeSwitchMap.containsKey(srcAddr)) {
+						logger.info("hostEdgeSwitchMap has key");
+					} else {
+						logger.info("no key is found");
+					}
+					DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
+					DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
+
+					// mst has not be calculated
+					if (!rootMstMap.containsKey(srcDpid)) {
+						calShortestPath(srcDpid);
+					}
+
+					List<Link> linkList = findFlow(srcDpid, dstDpid);
+					installFlow(srcAddr, dstAddr, linkList);
+					// Inject the first packet directly at the target switch
+					injectMessage(eth, "Forward Message");
+				}
+				break;
+			default:
+				break;
+		}
+		return Command.CONTINUE;
+	}
+
+	@Override
+	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
+		// DONE Auto-generated method stub
+		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
+		switchService = context.getServiceImpl(IOFSwitchService.class);
+		linkDiscoverer = context.getServiceImpl(ILinkDiscoveryService.class);
+		setupLogger();
+		isGraphCreated = false;
+		logger.info("Init");
+	}
+
+	@Override
+	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
+		// DONE Auto-generated method stub
+		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
+		logger.info("Start Up");
+
+		logger.info("Start Up End");
 	}
 }

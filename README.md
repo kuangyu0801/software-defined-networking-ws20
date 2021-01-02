@@ -6,6 +6,8 @@ sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/task14topo.py
 ```
 # 3.2 – Reactive Routing
 - links are assumed to be bidirectional
+- exception happened with null pointer but floodlight will not stop
+- need to carefully handle object initialization
 ## 實作
 
 - Steps:
