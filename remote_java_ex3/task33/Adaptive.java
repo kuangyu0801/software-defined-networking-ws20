@@ -253,14 +253,20 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 		switchService.getSwitch(srcDpid).write(flowAdd);
 	}
 
-	// DONE: STEP-4: install flow when PACKET_IN event (reactivly)
+	// DONE: STEP-4: install flow when PACKET_IN event (reactively)
 	private void installFlow(IPv4Address srcAddr, TransportPort srcTcpPort, IPv4Address dstAddr, TransportPort dstTcpPort, List<Link> list) {
 		// install all links one by one
-		logger.info("Install flow src: " + srcAddr.toString() + " dst: " + dstAddr.toString());
+		logger.info("=== install flow entries Flow [ srcIP: " + srcAddr + " dstIP: " + dstAddr + " srcPort: " + srcTcpPort + " dstPort: " + dstTcpPort + " ] ===");
 		for (Link link : list) {
-			logger.info("link src: " + link.getSrc().toString() + " dst: " + link.getDst().toString());
 			installOnSwitch(link.getSrc(), link.getSrcPort(), srcAddr, srcTcpPort, dstAddr, dstTcpPort);
 		}
+		/*
+		for (Link link : list) {
+			logger.info("*** install link in switch " + link.getSrc().toString() +
+					"\n                      link [ srcDpid: " + link.getSrc().toString() + " dstDpid: " + link.getDst().toString() + "]" +
+					"\n                      edge weight: " + linkCostMap.get(link));
+		}
+		*/
 	}
 
 	private void installEdgeSwitchToHost() {
@@ -329,9 +335,9 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 						// TODO: tuning for reasonable result
 						// ensure link weight fallback to hopcount when bandwidth not available
 						// ensure link weight always larger than zero
-						// cost is MB per second: 1MB = 10^6 byte
-						int cost = Math.abs((int) (bpsTx / 10^6) / 8) + 1;
-						logger.info("link: " + link.toString() + " cost: " + cost);
+						// cost is KB per second: 1MB = 10^3 byte
+						int cost = (int) (bpsTx / 10) / 8 + 1;
+						// logger.info("link: " + link.toString() + " bpsTx: " + bpsTx + " cost: " + cost);
 						linkCost.put(link, cost);
 					}
 				}
@@ -637,7 +643,7 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		linkDiscoverer = context.getServiceImpl(ILinkDiscoveryService.class);
 		stats = context.getServiceImpl(IStatisticsService.class);
-		setupLogger();
+		// setupLogger();
 		isGraphCreated = false;
 		logger.info("Init");
 	}

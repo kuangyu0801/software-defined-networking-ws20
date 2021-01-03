@@ -53,7 +53,7 @@ sudo mn --switch ovsk --controller remote,port=6653 --custom ~/ex3/fattree.py --
 
 - link weight should be proportional to utilization
 - iperf: https://linux.die.net/man/1/iperf
-
+- log跟performace似乎有點關係
 ```
 // server
 // format in Kbits, server, port on 5001, parallel tranmission
