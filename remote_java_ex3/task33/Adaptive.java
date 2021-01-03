@@ -179,22 +179,18 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	}
 
 	// DONE: STEP-2: calculate shortest path: using dijkstra
-	private void calShortestPath(DatapathId srcDpid, int costType, TransportPort dstPort) {
+	private BroadcastTree calShortestPath(DatapathId srcDpid, int costType, TransportPort dstPort) {
 		logger.info("calculated shortest path with switch: " + srcDpid.toString());
 		linkCostMap = initLinkCostMap(costType, switchPortLinkMap);
 		BroadcastTree broadcastTree = dijkstra(srcDpid, switchLinkMap, linkCostMap);
-		HashMap<TransportPort, BroadcastTree> transportMap = (HashMap<TransportPort, BroadcastTree>) 
-				rootMstMap.getOrDefault(srcDpid, new HashMap());
-		transportMap.put(dstPort, broadcastTree);
-		rootMstMap.putIfAbsent(srcDpid, transportMap);
+		return broadcastTree;
 	}
 
 	// DONE: STEP-3: create flow
 	// return the shortest route from src to dst
-	private List<Link> findFlow(DatapathId src, DatapathId dst, TransportPort dstPort) {
+	private List<Link> findFlow(DatapathId src, DatapathId dst, TransportPort dstPort, BroadcastTree mst) {
 		logger.info("find flow for src: " + src.toString() + " dst: " + dst.toString() + " dstPort: " + dstPort.toString());
 		List<Link> list = new ArrayList<>();
-		BroadcastTree mst = rootMstMap.get(src).get(dstPort);
 		// trace backward for the mst
 		DatapathId next = dst;
 		while (!next.equals(src)) {
@@ -205,14 +201,16 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 		return list;
 	}
 
-	private void installOnSwitch(IPv4Address dstAddr, DatapathId srcDpid, OFPort srcOFPort, TransportPort dstPort) {
+	private void installOnSwitch(DatapathId srcDpid, OFPort srcOFPort, IPv4Address srcAddr, TransportPort srcTcpPort, IPv4Address dstAddr, TransportPort dstTcpPort) {
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
-		// set the match field of destination IP
+		// set the match field of specific TCP flow
 		Match match = myFactory.buildMatch()
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setExact(MatchField.IPV4_DST, dstAddr)
+				.setExact(MatchField.IPV4_SRC, srcAddr)
 				.setExact(MatchField.IP_PROTO, IpProtocol.TCP)
-				.setExact(MatchField.TCP_DST, dstPort)
+				.setExact(MatchField.TCP_DST, dstTcpPort)
+				.setExact(MatchField.TCP_SRC, srcTcpPort)
 				.build();
 		// set actions of output flow of src output
 		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
@@ -256,12 +254,12 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	}
 
 	// DONE: STEP-4: install flow when PACKET_IN event (reactivly)
-	private void installFlow(IPv4Address srcAddr, IPv4Address dstAddr, List<Link> list, TransportPort dstPort) {
+	private void installFlow(IPv4Address srcAddr, TransportPort srcTcpPort, IPv4Address dstAddr, TransportPort dstTcpPort, List<Link> list) {
 		// install all links one by one
 		logger.info("Install flow src: " + srcAddr.toString() + " dst: " + dstAddr.toString());
 		for (Link link : list) {
 			logger.info("link src: " + link.getSrc().toString() + " dst: " + link.getDst().toString());
-			installOnSwitch(dstAddr, link.getSrc(), link.getSrcPort(), dstPort);
+			installOnSwitch(link.getSrc(), link.getSrcPort(), srcAddr, srcTcpPort, dstAddr, dstTcpPort);
 		}
 	}
 
@@ -332,7 +330,7 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 						// ensure link weight fallback to hopcount when bandwidth not available
 						// ensure link weight always larger than zero
 						// cost is MB per second: 1MB = 10^6 byte
-						int cost = (int) (bpsTx / 10^6) / 8 + 1;
+						int cost = Math.abs((int) (bpsTx / 10^6) / 8) + 1;
 						logger.info("link: " + link.toString() + " cost: " + cost);
 						linkCost.put(link, cost);
 					}
@@ -615,12 +613,12 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 						logger.info("PACKET_IN message from switch: " + sw.getId().toString() 
 								+ " TCP source port: " + srcPort
 								+ " TCP destination port: " + dstPort);
-						calShortestPath(srcDpid, BANDWIDTH, dstPort);
+						BroadcastTree broadcastTree = calShortestPath(srcDpid, BANDWIDTH, dstPort);
 				
 						// find the required path
-						List<Link> linkList = findFlow(srcDpid, dstDpid, dstPort);
+						List<Link> linkList = findFlow(srcDpid, dstDpid, dstPort, broadcastTree);
 						// install entries in switches along the path
-						installFlow(srcAddr, dstAddr, linkList, dstPort);
+						installFlow(srcAddr, srcPort, dstAddr, dstPort, linkList);
 					}
 					// Inject the first packet directly at the target switch
 					injectMessage(eth, "Forward Message");
