@@ -83,7 +83,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		return false;
 	}
 
-	private void injectMessage(Ethernet eth, String arpOpcode) {
+	private void injectMessage(Ethernet eth) {
 		logger.info("Inject message from controller");
 		IPv4 ipv4 = (IPv4) eth.getPayload();
 		IPv4Address dstAddress = ipv4.getDestinationAddress();
@@ -146,25 +146,13 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		logger.info("Getting switch-link map ");
 		switchLinkMap = linkDiscoverer.getSwitchLinks();
 		logger.info("Current switch links map size: " + switchLinkMap.size());
-
-		/*
-		for (DatapathId dpid: dpidSet) {
-			logger.info(dpid.toString());
-		}
-
-		for (DatapathId dpid : dpidSet) {
-			logger.info("Links of switch: " + dpid.toString());
-			switchLinkMap.containsKey(dpid);
-			for (Link link : switchLinkMap.get(dpid)) {
-				logger.info(link.toString());
-			}
-		}
-		*/
 	}
 
 	// DONE: STEP-2: calculate shortest path: using dijkstra
 	private void calShortestPath(DatapathId srcDpid) {
 		logger.info("calculated shortest path with switch: " + srcDpid.toString());
+		// In Task3.2, the topology is static, only need to calculate link cost map once
+		// But for generality, for both Task3.3, we recalculated every time
 		linkCostMap = initLinkCostMap(HOPCOUNT, switchLinkMap);
 		BroadcastTree broadcastTree = dijkstra(srcDpid, switchLinkMap, linkCostMap);
 		rootMstMap.put(srcDpid, broadcastTree);
@@ -237,21 +225,6 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 		//int tunnel_weight = portsWithLinks.size() + 1;
 
 		switch (type){
-/*			case HOPCOUNT_AVOID_TUNNELS:
-				log.debug("Using hop count with tunnel bias for metrics");
-				for (NodePortTuple npt : portsTunnel) {
-					if (links.get(npt) == null) {
-						continue;
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-						linkCost.put(link, tunnel_weight);
-					}
-				}
-				return linkCost;*/
-
 			case HOPCOUNT:
 				logger.info("Using hop count w/o tunnel bias for metrics");
 				for (DatapathId npt : links.keySet()) {
@@ -266,83 +239,6 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 					}
 				}
 				return linkCost;
-
-/*			case LATENCY:
-				log.debug("Using latency for path metrics");
-				for (NodePortTuple npt : links.keySet()) {
-					if (links.get(npt) == null) {
-						continue;
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-						if ((int)link.getLatency().getValue() < 0 ||
-								(int)link.getLatency().getValue() > MAX_LINK_WEIGHT) {
-							linkCost.put(link, MAX_LINK_WEIGHT);
-						} else {
-							linkCost.put(link,(int)link.getLatency().getValue());
-						}
-					}
-				}
-				return linkCost;*/
-
-/*			case LINK_SPEED:
-				TopologyManager.statisticsService.collectStatistics(true);
-				log.debug("Using link speed for path metrics");
-				for (NodePortTuple npt : links.keySet()) {
-					if (links.get(npt) == null) {
-						continue;
-					}
-					long rawLinkSpeed = 0;
-					IOFSwitch s = TopologyManager.switchService.getSwitch(npt.getNodeId());
-					if (s != null) {
-						OFPortDesc p = s.getPort(npt.getPortId());
-						if (p != null) {
-							rawLinkSpeed = p.getCurrSpeed();
-						}
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-
-						if ((rawLinkSpeed / 10^6) / 8 > 1) {
-							int linkSpeedMBps = (int)(rawLinkSpeed / 10^6) / 8;
-							linkCost.put(link, (1/linkSpeedMBps)*1000);
-						} else {
-							linkCost.put(link, MAX_LINK_WEIGHT);
-						}
-					}
-				}
-				return linkCost;*/
-
-/*			case UTILIZATION:
-				TopologyManager.statisticsService.collectStatistics(true);
-				log.debug("Using utilization for path metrics");
-				for (NodePortTuple npt : links.keySet()) {
-					if (links.get(npt) == null) continue;
-					SwitchPortBandwidth spb = TopologyManager.statisticsService
-							.getBandwidthConsumption(npt.getNodeId(), npt.getPortId());
-					long bpsTx = 0;
-					if (spb != null) {
-						bpsTx = spb.getBitsPerSecondTx().getValue();
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-
-						if ((bpsTx / 10^6) / 8 > 1) {
-							int cost = (int) (bpsTx / 10^6) / 8;
-							linkCost.put(link, cost);
-						} else {
-							linkCost.put(link, MAX_LINK_WEIGHT);
-						}
-					}
-				}
-				return linkCost;*/
-
 			default:
 				logger.info("Invalid Selection: Using Default Hop Count with Tunnel Bias for Metrics");
 				return linkCost;
@@ -542,7 +438,7 @@ public class Reactive implements IFloodlightModule, IOFMessageListener {
 					List<Link> linkList = findFlow(srcDpid, dstDpid);
 					installFlow(srcAddr, dstAddr, linkList);
 					// Inject the first packet directly at the target switch
-					injectMessage(eth, "Forward Message");
+					injectMessage(eth);
 				}
 				break;
 			default:
