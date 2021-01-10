@@ -73,9 +73,6 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	private Map<NodePortTuple, Set<Link>> switchPortLinkMap;
 	// to look up host ip with its connecting edge switch dpid and port
 	private Map<IPv4Address, Pair<DatapathId, OFPort>> hostEdgeSwitchMap;
-	// to look up shortest path with root Minimum spanning tree of that root
-	// consider both layer-3 and layer-4 match
-	private Map<DatapathId, Map<TransportPort, BroadcastTree>> rootMstMap = new HashMap<>();
 	private Map<Link,Integer> linkCostMap;
 
 	@Override
@@ -96,7 +93,7 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 		return false;
 	}
 
-	private void injectMessage(Ethernet eth, String arpOpcode) {
+	private void injectMessage(Ethernet eth) {
 		logger.info("Inject message from controller");
 		IPv4 ipv4 = (IPv4) eth.getPayload();
 		IPv4Address dstAddress = ipv4.getDestinationAddress();
@@ -140,18 +137,6 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 		return l;
 	}
 
-	private void setupLogger() {
-		// DONE: export logger output into log file
-		try {
-			FileHandler fileHandler = new FileHandler("/home/student/ex3/task33.log");
-			logger.addHandler(fileHandler);
-		} catch (Exception e) {
-			System.out.println("Failed to configure logging to file");
-		}
-	}
-
-
-
 	// DONE: STEP-1: link state detection: create directed graph for djikstra
 	private void createNetworkGraph() {
 		logger.info("Get all DatapathID");
@@ -179,8 +164,8 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	}
 
 	// DONE: STEP-2: calculate shortest path: using dijkstra
-	private BroadcastTree calShortestPath(DatapathId srcDpid, int costType, TransportPort dstPort) {
-		logger.info("calculated shortest path with switch: " + srcDpid.toString());
+	private BroadcastTree calShortestPath(DatapathId srcDpid, int costType) {
+		logger.info("calculated shortest path with source switch: " + srcDpid.toString());
 		linkCostMap = initLinkCostMap(costType, switchPortLinkMap);
 		BroadcastTree broadcastTree = dijkstra(srcDpid, switchLinkMap, linkCostMap);
 		return broadcastTree;
@@ -189,7 +174,7 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	// DONE: STEP-3: create flow
 	// return the shortest route from src to dst
 	private List<Link> findFlow(DatapathId src, DatapathId dst, TransportPort dstPort, BroadcastTree mst) {
-		logger.info("find flow for src: " + src.toString() + " dst: " + dst.toString() + " dstPort: " + dstPort.toString());
+		//logger.info("find flow for src: " + src.toString() + " dst: " + dst.toString() + " dstPort: " + dstPort.toString());
 		List<Link> list = new ArrayList<>();
 		// trace backward for the mst
 		DatapathId next = dst;
@@ -206,35 +191,11 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 		// set the match field of specific TCP flow
 		Match match = myFactory.buildMatch()
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-				.setExact(MatchField.IPV4_DST, dstAddr)
 				.setExact(MatchField.IPV4_SRC, srcAddr)
-				.setExact(MatchField.IP_PROTO, IpProtocol.TCP)
-				.setExact(MatchField.TCP_DST, dstTcpPort)
-				.setExact(MatchField.TCP_SRC, srcTcpPort)
-				.build();
-		// set actions of output flow of src output
-		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
-		OFActionOutput output = myFactory.actions().buildOutput()
-				.setMaxLen(0xFFffFFff)
-				.setPort(srcOFPort)
-				.build();
-		actionList.add(output);
-		//add a flow entry
-		OFFlowAdd flowAdd = myFactory.buildFlowAdd()
-				.setPriority(1)
-				.setMatch(match)
-				.setActions(actionList)
-				.build();
-		// set src switch
-		switchService.getSwitch(srcDpid).write(flowAdd);
-	}
-
-	private void installOnSwitch(IPv4Address dstAddr, DatapathId srcDpid, OFPort srcOFPort) {
-		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
-		// set the match field of destination IP
-		Match match = myFactory.buildMatch()
-				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setExact(MatchField.IPV4_DST, dstAddr)
+				.setExact(MatchField.IP_PROTO, IpProtocol.TCP)
+				.setExact(MatchField.TCP_SRC, srcTcpPort)
+				.setExact(MatchField.TCP_DST, dstTcpPort)
 				.build();
 		// set actions of output flow of src output
 		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
@@ -256,24 +217,17 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	// DONE: STEP-4: install flow when PACKET_IN event (reactively)
 	private void installFlow(IPv4Address srcAddr, TransportPort srcTcpPort, IPv4Address dstAddr, TransportPort dstTcpPort, List<Link> list) {
 		// install all links one by one
-		logger.info("=== install flow entries Flow [ srcIP: " + srcAddr + " dstIP: " + dstAddr + " srcPort: " + srcTcpPort + " dstPort: " + dstTcpPort + " ] ===");
-		for (Link link : list) {
+		logger.info("=== install flows in reverse order: Flow [ srcIP: " + srcAddr + " dstIP: " + dstAddr + " srcPort: " + srcTcpPort + " dstPort: " + dstTcpPort + " ] ===");
+		//install edge flow
+		Pair<DatapathId, OFPort> pair = hostEdgeSwitchMap.get(dstAddr);
+		installOnSwitch(pair.getKey(), pair.getValue(), srcAddr, srcTcpPort, dstAddr, dstTcpPort);
+		logger.info("*** install edge link in switch " + pair.getKey().toString());
+		//install core flow
+		for (Link link: list) {
 			installOnSwitch(link.getSrc(), link.getSrcPort(), srcAddr, srcTcpPort, dstAddr, dstTcpPort);
-		}
-		/*
-		for (Link link : list) {
-			logger.info("*** install link in switch " + link.getSrc().toString() +
+			logger.info("*** install core link in switch " + link.getSrc() +
 					"\n                      link [ srcDpid: " + link.getSrc().toString() + " dstDpid: " + link.getDst().toString() + "]" +
 					"\n                      edge weight: " + linkCostMap.get(link));
-		}
-		*/
-	}
-
-	private void installEdgeSwitchToHost() {
-		logger.info("Install all edge switches with host");
-		for (IPv4Address hostAddr : hostEdgeSwitchMap.keySet()) {
-			Pair<DatapathId, OFPort> pair = hostEdgeSwitchMap.get(hostAddr);
-			installOnSwitch(hostAddr, pair.getKey(), pair.getValue());
 		}
 	}
 
@@ -283,24 +237,8 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 	 * */
 	public Map<Link,Integer> initLinkCostMap(int type, Map<NodePortTuple, Set<Link>> links) {
 		Map<Link, Integer> linkCost = new HashMap<Link, Integer>();
-		//int tunnel_weight = portsWithLinks.size() + 1;
 		logger.info("Init link cost");
 		switch (type){
-/*			case HOPCOUNT_AVOID_TUNNELS:
-				log.debug("Using hop count with tunnel bias for metrics");
-				for (NodePortTuple npt : portsTunnel) {
-					if (links.get(npt) == null) {
-						continue;
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-						linkCost.put(link, tunnel_weight);
-					}
-				}
-				return linkCost;*/
-
 			case HOPCOUNT:
 				logger.info("Using hop count w/o tunnel bias for metrics");
 				for (NodePortTuple npt : links.keySet()) {
@@ -336,88 +274,12 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 						// ensure link weight fallback to hopcount when bandwidth not available
 						// ensure link weight always larger than zero
 						// cost is KB per second: 1MB = 10^3 byte
-						int cost = (int) (bpsTx / 10) / 8 + 1;
+						int cost = (int) (bpsTx)/8 + 1;
 						// logger.info("link: " + link.toString() + " bpsTx: " + bpsTx + " cost: " + cost);
 						linkCost.put(link, cost);
 					}
 				}
 				return linkCost;
-/*			case LATENCY:
-				log.debug("Using latency for path metrics");
-				for (NodePortTuple npt : links.keySet()) {
-					if (links.get(npt) == null) {
-						continue;
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-						if ((int)link.getLatency().getValue() < 0 ||
-								(int)link.getLatency().getValue() > MAX_LINK_WEIGHT) {
-							linkCost.put(link, MAX_LINK_WEIGHT);
-						} else {
-							linkCost.put(link,(int)link.getLatency().getValue());
-						}
-					}
-				}
-				return linkCost;*/
-
-/*			case LINK_SPEED:
-				TopologyManager.statisticsService.collectStatistics(true);
-				log.debug("Using link speed for path metrics");
-				for (NodePortTuple npt : links.keySet()) {
-					if (links.get(npt) == null) {
-						continue;
-					}
-					long rawLinkSpeed = 0;
-					IOFSwitch s = TopologyManager.switchService.getSwitch(npt.getNodeId());
-					if (s != null) {
-						OFPortDesc p = s.getPort(npt.getPortId());
-						if (p != null) {
-							rawLinkSpeed = p.getCurrSpeed();
-						}
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-
-						if ((rawLinkSpeed / 10^6) / 8 > 1) {
-							int linkSpeedMBps = (int)(rawLinkSpeed / 10^6) / 8;
-							linkCost.put(link, (1/linkSpeedMBps)*1000);
-						} else {
-							linkCost.put(link, MAX_LINK_WEIGHT);
-						}
-					}
-				}
-				return linkCost;*/
-
-/*			case UTILIZATION:
-				TopologyManager.statisticsService.collectStatistics(true);
-				log.debug("Using utilization for path metrics");
-				for (NodePortTuple npt : links.keySet()) {
-					if (links.get(npt) == null) continue;
-					SwitchPortBandwidth spb = TopologyManager.statisticsService
-							.getBandwidthConsumption(npt.getNodeId(), npt.getPortId());
-					long bpsTx = 0;
-					if (spb != null) {
-						bpsTx = spb.getBitsPerSecondTx().getValue();
-					}
-					for (Link link : links.get(npt)) {
-						if (link == null) {
-							continue;
-						}
-
-						if ((bpsTx / 10^6) / 8 > 1) {
-							int cost = (int) (bpsTx / 10^6) / 8;
-							linkCost.put(link, cost);
-						} else {
-							linkCost.put(link, MAX_LINK_WEIGHT);
-						}
-					}
-				}
-				return linkCost;*/
-
 			default:
 				logger.info("Invalid Selection: Using Default Hop Count with Tunnel Bias for Metrics");
 				return linkCost;
@@ -537,9 +399,10 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 				}
 
 				int ndist = curDist + w; // the weight of the link, always 1 in current version of floodlight.
+				/*
 				logger.info("Neighbor: " + neighbor.getLong());
 				logger.info("Neighbor cost: " + cost.get(neighbor));
-
+				*/
 				if (ndist < cost.get(neighbor)) {
 					cost.put(neighbor, ndist);
 					nexthoplinks.put(neighbor, link);
@@ -584,7 +447,6 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 		// create graph in receive(), because this is a "rather" steady static
 		if (!isGraphCreated) {
 			initHostEdgeSwitch();
-			installEdgeSwitchToHost();
 			createNetworkGraph();
 			isGraphCreated = true;
 		}
@@ -599,13 +461,6 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 					IPv4Address srcAddr = ipv4Pkt.getSourceAddress();
 					IPv4Address dstAddr = ipv4Pkt.getDestinationAddress();
 					// retrieving the dpid of source switch
-					logger.info("src ip: " + srcAddr.toString());
-					logger.info("dst ip: " + dstAddr.toString());
-					if (hostEdgeSwitchMap.containsKey(srcAddr)) {
-						logger.info("hostEdgeSwitchMap has key");
-					} else {
-						logger.info("no key is found");
-					}
 					DatapathId srcDpid = hostEdgeSwitchMap.get(srcAddr).getKey();
 					DatapathId dstDpid = hostEdgeSwitchMap.get(dstAddr).getKey();
 
@@ -619,15 +474,15 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 						logger.info("PACKET_IN message from switch: " + sw.getId().toString() 
 								+ " TCP source port: " + srcPort
 								+ " TCP destination port: " + dstPort);
-						BroadcastTree broadcastTree = calShortestPath(srcDpid, BANDWIDTH, dstPort);
-				
+						// calculate the shortest-path tree with link cost map initialization and Dijkstra
+						BroadcastTree broadcastTree = calShortestPath(srcDpid, BANDWIDTH);
 						// find the required path
 						List<Link> linkList = findFlow(srcDpid, dstDpid, dstPort, broadcastTree);
 						// install entries in switches along the path
 						installFlow(srcAddr, srcPort, dstAddr, dstPort, linkList);
 					}
 					// Inject the first packet directly at the target switch
-					injectMessage(eth, "Forward Message");
+					injectMessage(eth);
 				}
 				break;
 			default:
