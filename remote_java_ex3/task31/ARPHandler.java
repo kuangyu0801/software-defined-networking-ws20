@@ -50,7 +50,6 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 
 	protected IFloodlightProviderService floodlightProvider;
 	protected IOFSwitchService switchService;
-	private boolean isInstalled = false;
 	private Map<IPv4Address, MacAddress> mapCentralArpCache;
 	private Map<DatapathId, Map<IPv4Address, OFPort>> mapRoutingTables;
 	private Map<IPv4Address, DatapathId> mapHostToSwitch;
@@ -79,18 +78,7 @@ public class ARPHandler implements IFloodlightModule, IOFMessageListener {
 	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		// TODO Auto-generated method stub
 		switch(msg.getType()) {
-			case PACKET_IN:
-				// install all ip flows in advance
-//				if (!isInstalled) {					
-//					for (DatapathId dpid : switchService.getAllSwitchDpids()) {
-//						logger.info("Links of switch" + dpid.toString());
-//						for (Link link : linkDiscoverer.getSwitchLinks().get(dpid)) {
-//							logger.info(link.toString());
-//						}
-//					}
-//					isInstalled = true;
-//				}
-				
+			case PACKET_IN:				
 				Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 				if (eth.getEtherType() == EthType.ARP) {
 					OFPacketIn piMsg = (OFPacketIn) msg;
