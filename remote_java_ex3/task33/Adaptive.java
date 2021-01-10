@@ -273,7 +273,7 @@ public class Adaptive implements IFloodlightModule, IOFMessageListener {
 						// TODO: tuning for reasonable result
 						// ensure link weight fallback to hopcount when bandwidth not available
 						// ensure link weight always larger than zero
-						// cost is KB per second: 1MB = 10^3 byte
+						// cost unit: byte per second
 						int cost = (int) (bpsTx)/8 + 1;
 						// logger.info("link: " + link.toString() + " bpsTx: " + bpsTx + " cost: " + cost);
 						linkCost.put(link, cost);
