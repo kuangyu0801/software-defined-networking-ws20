@@ -95,4 +95,7 @@ logger.debug("Temperature set to {}. Old temperature was {}.", newT, oldT);
 - https://www.itread01.com/content/1543703178.html
     + java出現“No enclosing instance of type XXX is accessible”
 - https://www.cyberciti.biz/faq/howto-reboot-linux/
+- 可以使用switch listener去聽switch changes, 這樣可以避免race condition
+    + Interface IOFSwitchListener
+    + http://floodlight.github.io/floodlight/javadoc/floodlight/net/floodlightcontroller/core/IOFSwitchListener.html#switchChanged-org.projectfloodlight.openflow.types.DatapathId-
 
