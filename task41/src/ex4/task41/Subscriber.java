@@ -1,3 +1,5 @@
+package ex4.task41;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -13,6 +15,16 @@ public class Subscriber {
     private boolean isFilterAll;
     private boolean isGreater; // comparator: true: greater than, false: less and equal
 
+
+    /**
+     *
+     * @param udpPort
+     * @param type
+     * @param rVal
+     * @param isFilterAll
+     * @param isGreater
+     * @throws SocketException
+     */
     public Subscriber(int udpPort, int type, int rVal, boolean isFilterAll, boolean isGreater) throws SocketException {
         this.udpPort = udpPort;
         this.type = type;
@@ -20,7 +32,7 @@ public class Subscriber {
         this.isFilterAll = isFilterAll;
         this.isGreater = isGreater;
         datagramSocket = new DatagramSocket(udpPort);
-        logger.info("[Init Subscriber]" + "UDP port: " + udpPort + ", Type: " + ((type == 0) ? "Energy" : "Power") +
+        logger.info("[Init Subscriber] " + "UDP port: " + udpPort + ", Type: " + ((type == 0) ? "Energy" : "Power") +
                 ", reference Value: " + rVal +  "Filter All: " + isFilterAll + "Comparator: " + ((isGreater) ? ">": "<=" ));
     }
 
