@@ -2,7 +2,13 @@
 
 - write a "subscriber" application (pref. Python or Java) which receives UDP datagrams containing measurement data and
 possibly filters them by measurement type (0 for energy and 1 for power) and value (greater, less or equal to a certain reference value)
-
+    + Subscriber input parameters: 
+        - UDP port
+        - measurement type
+        - comparison operator
+        - reference value
+        - whether to filter at all
+        
 - Write a script ~/ex4/task41.sh which install flows for: 
     - ARP broadcast and IP forwarding in the 10.0.0.0/8 network
     - forwarding of measurements (matched by the multicast IP 230.0.0.0/8) to all subscribers
