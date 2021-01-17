@@ -14,6 +14,13 @@ possibly filters them by measurement type (0 for energy and 1 for power) and val
     - forwarding of measurements (matched by the multicast IP 230.0.0.0/8) to all subscribers
 - Compare the size of the unfiltered vs. filtered output
 - UDP programming reference: https://www.baeldung.com/udp-in-java
+```
+java Subscriber 50001 1 500 all gt
+java Subscriber 50002 1 100 all gt
+java Subscriber 50003 0 30 all st
+java Subscriber 50004 0 136 all gt
+```
+
 # 4.2 – Content-based Routing
 
 # 4.3 – REST Interface for Content-based Routing
