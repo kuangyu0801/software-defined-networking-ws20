@@ -1,5 +1,3 @@
-package ex4.task41;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;

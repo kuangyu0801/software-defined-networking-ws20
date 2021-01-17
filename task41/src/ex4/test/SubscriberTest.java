@@ -5,16 +5,7 @@ import ex4.task41.Subscriber;
 import org.junit.Test;
 import java.io.IOException;
 
-import static org.junit.Assert.assertFalse;
-
-
 public class SubscriberTest {
-
-    @Test
-    public void dummy() {
-        System.out.println("dummy");
-        assertFalse("dummy".equals("hello server"));
-    }
 
     @Test
     public void dummyTest() throws IOException {
@@ -24,7 +15,6 @@ public class SubscriberTest {
         EchoServer echoServer = new EchoServer(udpPort + 1);
         echoServer.start();
         subscriber.test();
-
 
     }
 

@@ -13,7 +13,7 @@ possibly filters them by measurement type (0 for energy and 1 for power) and val
     - ARP broadcast and IP forwarding in the 10.0.0.0/8 network
     - forwarding of measurements (matched by the multicast IP 230.0.0.0/8) to all subscribers
 - Compare the size of the unfiltered vs. filtered output
-
+- UDP programming reference: https://www.baeldung.com/udp-in-java
 # 4.2 – Content-based Routing
 
 # 4.3 – REST Interface for Content-based Routing
