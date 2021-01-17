@@ -1,3 +1,11 @@
+# TOD0
+- finish task 4.1 for parsing and min/max
+
+# NICE TO HAVE
+- task 4.1 could consider to use broadcast ip instead of modifying single IP
+
+
+
 # 4.1 – Pub-Sub Routing
 
 - write a "subscriber" application (pref. Python or Java) which receives UDP datagrams containing measurement data and
@@ -27,7 +35,9 @@ java Subscriber 50004 0 136 all gt
 
 - Create a package net.sdnlab.ex4.task43 for a Floodlight Module
 providing the following REST interface:
+- Floodlight Tutorial: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/15040589/How+to+add+a+REST+API+to+a+Module
 - Java JSON: http://tutorials.jenkov.com/java-json/index.html
+
 
 ```
 ssh sdnfp04_proxy
