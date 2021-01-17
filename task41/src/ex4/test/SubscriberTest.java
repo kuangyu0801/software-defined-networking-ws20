@@ -1,15 +1,31 @@
 package ex4.test;
 
+import ex4.task41.EchoServer;
 import ex4.task41.Subscriber;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
+import java.io.IOException;
 
-import java.net.SocketException;
+import static org.junit.Assert.assertFalse;
+
 
 public class SubscriberTest {
 
     @Test
-    private void dummyTest() throws SocketException {
-        System.out.println("I'm dummy test");
-        Subscriber subscriber = new Subscriber(5001, 0, 10, true, true);
+    public void dummy() {
+        System.out.println("dummy");
+        assertFalse("dummy".equals("hello server"));
     }
+
+    @Test
+    public void dummyTest() throws IOException {
+        System.out.println("I'm dummy test");
+        int udpPort = 5001;
+        Subscriber subscriber = new Subscriber(udpPort, 0, 10, true, true);
+        EchoServer echoServer = new EchoServer(udpPort + 1);
+        echoServer.start();
+        subscriber.test();
+
+
+    }
+
 }
