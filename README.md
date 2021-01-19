@@ -32,11 +32,33 @@ java Subscriber 50004 0 136 all gt
 # 4.2 – Content-based Routing
 
 # 4.3 – REST Interface for Content-based Routing
-
+完成
+- review HTTP and assignment of SoC
+- 
+- floodlight controller:
+    - requirement:
+        + POST: parsing all field, record, (generate + install all flows)
+        + DELETE: erase all flows, take out the generate a new flow, turn them into deleteFlow, and install it
+        + GET: return a json file, taking all the subscritions and serilize it into a JSON file
+    - side note:
+        + 因為沒有update, 所以我們只需要把整個flow覆蓋掉即可    
+- host application:
+    - update your subscriber application to use this REST- interface to register subscriptions!
+        + java application http方法調用
+        + optional: java 如何在run的時候得到新的update(多線程調用)
+- 測試方法：
+    + floodlight controller: 透過curl直接運行jason file
+    + subscriber application: 要在local先試過能不能reach到local host的content    
+    
 - Create a package net.sdnlab.ex4.task43 for a Floodlight Module
 providing the following REST interface:
 - Floodlight Tutorial: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/15040589/How+to+add+a+REST+API+to+a+Module
+- Floodlight delete flow: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/1343547/How+to+use+OpenFlowJ-Loxigen
+```
+OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
+```
 - Java JSON: http://tutorials.jenkov.com/java-json/index.html
+
 
 
 ```
