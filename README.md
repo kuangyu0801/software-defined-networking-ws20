@@ -28,6 +28,8 @@ java Subscriber 50002 1 100 all gt
 java Subscriber 50003 0 30 all st
 java Subscriber 50004 0 136 all gt
 ```
+- Runtime.getRuntime().addShutdownHook 使用实例
+    + https://blog.csdn.net/HeatDeath/article/details/81668406
 
 # 4.2 – Content-based Routing
 
