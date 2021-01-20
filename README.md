@@ -32,9 +32,9 @@ java Subscriber 50004 0 136 all gt
 # 4.2 – Content-based Routing
 
 # 4.3 – REST Interface for Content-based Routing
-完成
+ TODO 完成
 - review HTTP and assignment of SoC
-- 
+- java serialization to json and flow install
 - floodlight controller:
     - requirement:
         + POST: parsing all field, record, (generate + install all flows)
@@ -54,6 +54,7 @@ java Subscriber 50004 0 136 all gt
 providing the following REST interface:
 - Floodlight Tutorial: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/15040589/How+to+add+a+REST+API+to+a+Module
 - Floodlight delete flow: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/1343547/How+to+use+OpenFlowJ-Loxigen
+- JSON Parser: https://github.com/FasterXML/jackson-databind
 ```
 OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
 ```
