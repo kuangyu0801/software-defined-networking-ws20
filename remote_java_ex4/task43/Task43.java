@@ -23,6 +23,14 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	// TODO: add any other required services
 
 	protected static Logger logger;
+	
+	public static class Columns {
+		public static final String COLUMN_UDP_PORT = "udp_port";
+		public static final String COLUMN_TYPE = "type";
+		public static final String COLUMN_REFERENCE_VALUE = "reference_value";
+		public static final String COLUMN_FILTER_ENALBE = "filter_enable";
+		public static final String COLUMN_IS_GREATER = "is_greater";
+	}
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -76,7 +84,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	}
 
 	@Override
-	public String addSubscription(String name /* TODO: add arguments */) {
+	public String addSubscription(String name /* TODO: add arguments */, Subscription sub) {
 		logger.info("Adding subscription " + name); // you may change logging to your liking
 		String status;
 

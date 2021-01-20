@@ -3,11 +3,23 @@
  */
 package net.sdnlab.ex4.task43;
 
+import java.io.IOException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.MappingJsonFactory;
+
 /**
  * @author student
  * Class for manage subscription
  */
 public class Subscription {
+	
+	protected static Logger logger = LoggerFactory.getLogger(Task43.class);
     private int udpPort;
     private int type; // measurement type: 0: energy, 1: power
     private int rVal; // reference value
@@ -60,5 +72,66 @@ public class Subscription {
 
 	public void setGreater(boolean isGreater) {
 		this.isGreater = isGreater;
+	}
+
+	/**
+	 *
+	 * @param fmJson
+	 * @return
+	 * @throws IOException
+	 * reference: https://github.com/floodlight/floodlight/blob/d737cb05656a6038f4e2277ffb4503d45b7b29cb/src/main/java/net/floodlightcontroller/staticentry/StaticEntries.java#L109 
+	 */
+	public static Subscription jsonToSubscription(String fmJson) throws IOException {
+
+		MappingJsonFactory f = new MappingJsonFactory();
+		JsonParser jp = null;
+
+		try {
+			jp = f.createParser(fmJson);
+		} catch (JsonParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		Integer udpPort = null;
+		Integer type = null; // measurement type: 0: energy, 1: power
+		Integer rVal = null; // reference value
+		Boolean isFiltered = null; // true: is filter enabled
+		Boolean isGreater = null; // comparator: true: greater than, false: less and equal
+
+		jp.nextToken();
+
+		if (jp.getCurrentToken() != JsonToken.START_OBJECT) {
+			throw new IOException("Expected START_OBJECT");
+		}
+
+		while (jp.nextToken() != JsonToken.END_OBJECT) {
+			if (jp.getCurrentToken() != JsonToken.FIELD_NAME) {
+				throw new IOException("Expected FIELD_NAME");
+			}
+
+			String n = jp.getCurrentName().toLowerCase().trim();
+			
+			jp.nextToken();
+			
+			if (n.equals(Task43.Columns.COLUMN_FILTER_ENALBE)) {
+				isFiltered = jp.getBooleanValue();
+			} else if (n.equals(Task43.Columns.COLUMN_UDP_PORT)) {
+				udpPort = jp.getIntValue();
+			} else if (n.equals(Task43.Columns.COLUMN_TYPE)) {
+				type = jp.getIntValue();
+			} else if (n.equals(Task43.Columns.COLUMN_REFERENCE_VALUE)) {
+				rVal = jp.getIntValue();
+			} else if (n.equals(Task43.Columns.COLUMN_IS_GREATER)) {
+				isGreater = jp.getBooleanValue();
+			}
+		}
+		logger.info("Create new Subscription " + "UDP port: " + udpPort + ", Type: " + ((type == 0) ? "Energy" : "Power") +
+                ", reference Value: " + rVal +  ", Filter: " + ((isFiltered) ? ("Enabled") : "Disabled") + ", Comparator: " + ((isGreater) ? ">": "<=" ));
+		Subscription sub = new Subscription(udpPort, type, rVal, isFiltered, isGreater);
+		return sub;
 	}
 }

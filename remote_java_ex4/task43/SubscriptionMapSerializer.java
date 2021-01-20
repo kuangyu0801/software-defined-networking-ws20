@@ -41,11 +41,11 @@ public class SubscriptionMapSerializer extends JsonSerializer<SubscriptionMap>{
 					Subscription sub = theMap.get(name);
 					jGen.writeArrayFieldStart(name);
 					jGen.writeStartObject();
-					jGen.writeNumberField("updport", sub.getUdpPort());
-					jGen.writeBooleanField("filter_enable", sub.isFiltered());
-					jGen.writeNumberField("type", sub.getType());
-					jGen.writeNumberField("reference_value", sub.getrVal());
-					jGen.writeBooleanField("is_greater", sub.isGreater());
+					jGen.writeNumberField(Task43.Columns.COLUMN_UDP_PORT, sub.getUdpPort());
+					jGen.writeBooleanField(Task43.Columns.COLUMN_FILTER_ENALBE, sub.isFiltered());
+					jGen.writeNumberField(Task43.Columns.COLUMN_TYPE, sub.getType());
+					jGen.writeNumberField(Task43.Columns.COLUMN_REFERENCE_VALUE, sub.getrVal());
+					jGen.writeBooleanField(Task43.Columns.COLUMN_IS_GREATER, sub.isGreater());
 					jGen.writeEndObject();
 					jGen.writeEndArray();
 				}

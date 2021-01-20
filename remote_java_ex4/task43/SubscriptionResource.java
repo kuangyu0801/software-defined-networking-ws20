@@ -1,5 +1,7 @@
 package net.sdnlab.ex4.task43;
 
+import java.io.IOException;
+
 import org.restlet.resource.Delete;
 import org.restlet.resource.Post;
 import org.restlet.resource.ServerResource;
@@ -11,11 +13,17 @@ public class SubscriptionResource extends ServerResource {
 		ITask43Service task43Service = (ITask43Service) getContext().getAttributes()
 				.get(ITask43Service.class.getCanonicalName());
 		String name = (String) getRequestAttributes().get("name");
-
-		// TODO: parse JSON
+		Subscription sub = null;
+		// DONE: parse JSON
+		try {
+			sub = Subscription.jsonToSubscription(json);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		System.out.println("Post Request: "+json);
 
-		return task43Service.addSubscription(name /* TODO: add arguments */);
+		return task43Service.addSubscription(name , sub/* DONE: add arguments */);
 	}
 
 	@Delete
