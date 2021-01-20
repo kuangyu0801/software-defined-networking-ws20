@@ -1,3 +1,4 @@
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -12,9 +13,14 @@ public class Subscriber {
     private int udpPort;
     private int type; // measurement type: 0: energy, 1: power
     private int rVal; // reference value
-    private boolean isFilterAll;
+    private boolean isFiltered;
     private boolean isGreater; // comparator: true: greater than, false: less and equal
-
+    private int rcvMax = Integer.MIN_VALUE;
+    private int rcvMin = Integer.MAX_VALUE;
+    private int matchMax = Integer.MIN_VALUE;
+    private int matchMin = Integer.MAX_VALUE;
+    private int rcvCount = 0;
+    private int matchCount = 0;
     /**
      *
      * @param udpPort
@@ -28,7 +34,7 @@ public class Subscriber {
         this.udpPort = udpPort;
         this.type = type;
         this.rVal = rVal;
-        this.isFilterAll = isFiltered;
+        this.isFiltered = isFiltered;
         this.isGreater = isGreater;
         datagramSocket = new DatagramSocket(udpPort);
         logger.info("[INIT] " + "UDP port: " + udpPort + ", Type: " + ((type == 0) ? "Energy" : "Power") +
@@ -38,10 +44,26 @@ public class Subscriber {
 
     public void listen() throws IOException {
         System.out.println("Listening");
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() {
+                try {
+                    Thread.sleep(200);
+                    System.out.println("Shouting down ...");
+                    //some cleaning up code...
+                    System.out.println("Unfiltered match: Total received count:" + rcvCount + ", max: " + rcvMax + ", min: " + rcvMin);
+                    System.out.println("Filtered match: Total received count:" + matchCount +  ", max: " + matchMax + ", min: " + matchMin);
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        });
         while (true) {
             receive();
         }
+
     }
+
 
     private void receive() throws IOException {
         byte[] receiveBuffer = new byte[1024];
@@ -50,6 +72,23 @@ public class Subscriber {
         String receiveData = new String(receivePacket.getData());
         System.out.println("[Subscriber][R]" + receiveData.trim());
         String[] infos = receiveData.split(",");
+
+        int curValue = Integer.parseInt(infos[2]);
+        int curType = Integer.parseInt(infos[3]);
+        rcvMax = Math.max(rcvMax, curValue);
+        rcvMin = Math.min(rcvMin, curValue);
+
+        if (isFiltered) {
+            if (curType == type && ((isGreater && (curValue) > rVal) || (!isGreater && curValue <= rVal))) {
+                System.out.println(receiveData);
+                matchMax = Math.max(matchMax, curValue);
+                matchMin = Math.min(matchMin, curValue);
+                matchCount += 1;
+            }
+        } else {
+            System.out.println(receiveData);
+        }
+        rcvCount += 1;
     }
 
     /**
