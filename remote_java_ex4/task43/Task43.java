@@ -86,7 +86,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		logger.info("Listing all subscriptions"); // you may change logging to your liking
 		String jsonSubscriptions = "{}";
 
-		// TODO Implement!
+		// DONE Implement!
 		System.out.println("receive a GET Request");
 		JsonFactory f = new JsonFactory(); // may alternatively construct directly too
 
@@ -98,6 +98,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 			jGen.writeStartObject();
 			if (subMap.keySet() != null) {
 				for (String name: subMap.keySet()) {
+					// TODO: convert all types to String
 					if (subMap.get(name) != null) {
 						Subscription sub = subMap.get(name);
 						jGen.writeArrayFieldStart(name);
@@ -124,11 +125,11 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	}
 
 	@Override
-	public String addSubscription(String name /* TODO: add arguments */, Subscription sub) {
+	public String addSubscription(String name /* DONE: add arguments */, Subscription sub) {
 		logger.info("Adding subscription " + name); // you may change logging to your liking
 		String status;
 
-		// TODO Implement!
+		// DONE Implement!
 		System.out.println("Post Request from: "+name);
 		if (subMap.containsKey(name)) {
 			status = "Error! Subscription " + name + " already exists";
@@ -157,7 +158,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		logger.info("Deleting subscription " + name); // you may change logging to your liking
 		String status;
 
-		// TODO Implement!
+		// DONE Implement!
 		if (subMap.containsKey(name)) {
 			status = "Successfully deleted subscription " + name;
 			subMap.remove(name);
