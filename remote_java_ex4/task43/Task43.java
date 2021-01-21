@@ -1,5 +1,8 @@
 package net.sdnlab.ex4.task43;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -7,6 +10,10 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonEncoding;
 
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
@@ -31,6 +38,8 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		public static final String COLUMN_FILTER_ENALBE = "filter_enable";
 		public static final String COLUMN_IS_GREATER = "is_greater";
 	}
+	
+	private Map<String, Subscription> subMap = new HashMap<>();
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -79,7 +88,38 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 
 		// TODO Implement!
 		System.out.println("receive a GET Request");
+		JsonFactory f = new JsonFactory(); // may alternatively construct directly too
 
+		// First: write simple JSON output
+		StringWriter sw = new StringWriter();
+		JsonGenerator jGen;
+		try {
+			jGen = f.createGenerator(sw);			
+			jGen.writeStartObject();
+			if (subMap.keySet() != null) {
+				for (String name: subMap.keySet()) {
+					if (subMap.get(name) != null) {
+						Subscription sub = subMap.get(name);
+						jGen.writeArrayFieldStart(name);
+						jGen.writeStartObject();
+						jGen.writeNumberField(Task43.Columns.COLUMN_UDP_PORT, sub.getUdpPort());
+						jGen.writeBooleanField(Task43.Columns.COLUMN_FILTER_ENALBE, sub.isFiltered());
+						jGen.writeNumberField(Task43.Columns.COLUMN_TYPE, sub.getType());
+						jGen.writeNumberField(Task43.Columns.COLUMN_REFERENCE_VALUE, sub.getrVal());
+						jGen.writeBooleanField(Task43.Columns.COLUMN_IS_GREATER, sub.isGreater());
+						jGen.writeEndObject();
+						jGen.writeEndArray();
+					}
+				}
+			}
+			jGen.writeEndObject();
+			jGen.close();
+			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		jsonSubscriptions = sw.toString();
 		return jsonSubscriptions;
 	}
 
@@ -90,10 +130,26 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 
 		// TODO Implement!
 		System.out.println("Post Request from: "+name);
-
-		status = "Successfully added new subscription " + name;
-		// status = "Error! Subscription " + name + " already exists";
+		if (subMap.containsKey(name)) {
+			status = "Error! Subscription " + name + " already exists";
+		} else {
+			status = "Successfully added new subscription " + name;
+			subMap.put(name, sub);
+			createFlow(name, sub);
+			installFlow(name, sub);
+		}
+		 
 		return "{\"status\":\"" + status + "\"}";
+	}
+
+	// TODO: complete method
+	private void installFlow(String name, Subscription sub) {
+		
+	}
+	
+	// TODO: complete method
+	private void createFlow(String name, Subscription sub) {
+		
 	}
 
 	@Override
@@ -102,10 +158,20 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		String status;
 
 		// TODO Implement!
-
-		status = "Successfully deleted subscription " + name;
-		// status = "Error! Subscription " + name + " does not exist";
+		if (subMap.containsKey(name)) {
+			status = "Successfully deleted subscription " + name;
+			subMap.remove(name);
+			deleteFlow(name);
+		} else {
+			status = "Error! Subscription " + name + " does not exist";
+		}
 		return "{\"status\":\"" + status + "\"}";
+	}
+
+	// TODO: complete method
+	private void deleteFlow(String name) {
+		
+		
 	}
 
 }

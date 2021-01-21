@@ -32,6 +32,10 @@ java Subscriber 50004 0 136 all gt
 # 4.2 – Content-based Routing
 
 # 4.3 – REST Interface for Content-based Routing
+## Open issue
+- 同一個host重複訂閱我們要怎樣處理
+    + 不允許重複訂閱（implicitly 只允許
+
 ## TODO 完成
 - java application http方法調用
 - review HTTP and assignment of SoC
@@ -41,7 +45,7 @@ java Subscriber 50004 0 136 all gt
     - requirement:
         + POST: parsing all field, record, (generate + install all flows)
         + DELETE: erase all flows, take out the generate a new flow, turn them into deleteFlow, and install it
-        + GET: return a json file, taking all the subscritions and serilize it into a JSON file
+        + GET: return a json file, taking all the subscriptions and serialize it into a JSON file
     - side note:
         + 因為沒有update, 所以我們只需要把整個flow覆蓋掉即可    
 - host application:
@@ -67,7 +71,7 @@ step5: 另开一个terminal 输入 wireshark
 step6: ctrl+c关掉 /opt/floodlight/floodlight-noforwarding.sh
 step7: eclipse 运行task43.launch
 step8: mininet 运行 xterm sub1，然后可以curl -X POST -d '{"name":"xxx"}' http://10.10.10.10:8080/subscriptions/sub1/json
-stpe9: wireshark監控“s1-eth3", 使用filter "http"
+stpe9: wireshark監控“s1-eth3", 使用filter "http" (只有透過mininet發送的請求可以在這邊監控到，無法直接監控controller)
 
 ```
 OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
