@@ -61,7 +61,7 @@ providing the following REST interface:
 - Floodlight Tutorial: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/15040589/How+to+add+a+REST+API+to+a+Module
 - Floodlight delete flow: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/1343547/How+to+use+OpenFlowJ-Loxigen
 - JSON Parser: https://github.com/FasterXML/jackson-databind
-
+- Java 实现 HTTP 请求的三种方式: https://zhuanlan.zhihu.com/p/69285935
 # execution step
 step1: /opt/floodlight/floodlight-noforwarding.sh
 step2: sudo ~/ex4/mininet4.py
