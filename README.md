@@ -4,8 +4,6 @@
 # NICE TO HAVE
 - task 4.1 could consider to use broadcast ip instead of modifying single IP
 
-
-
 # 4.1 – Pub-Sub Routing
 
 - write a "subscriber" application (pref. Python or Java) which receives UDP datagrams containing measurement data and
@@ -34,9 +32,11 @@ java Subscriber 50004 0 136 all gt
 # 4.2 – Content-based Routing
 
 # 4.3 – REST Interface for Content-based Routing
- TODO 完成
+## TODO 完成
+- java application http方法調用
 - review HTTP and assignment of SoC
 - java serialization to json and flow install
+# Requirement
 - floodlight controller:
     - requirement:
         + POST: parsing all field, record, (generate + install all flows)
@@ -57,6 +57,18 @@ providing the following REST interface:
 - Floodlight Tutorial: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/15040589/How+to+add+a+REST+API+to+a+Module
 - Floodlight delete flow: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/1343547/How+to+use+OpenFlowJ-Loxigen
 - JSON Parser: https://github.com/FasterXML/jackson-databind
+
+# execution step
+step1: /opt/floodlight/floodlight-noforwarding.sh
+step2: sudo ~/ex4/mininet4.py
+step3: sh task43.sh
+step4: mininet cmd运行 pingall
+step5: 另开一个terminal 输入 wireshark
+step6: ctrl+c关掉 /opt/floodlight/floodlight-noforwarding.sh
+step7: eclipse 运行task43.launch
+step8: mininet 运行 xterm sub1，然后可以curl -X POST -d '{"name":"xxx"}' http://10.10.10.10:8080/subscriptions/sub1/json
+stpe9: wireshark監控“s1-eth3", 使用filter "http"
+
 ```
 OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
 ```
@@ -72,6 +84,8 @@ sshfs sdnfp04_proxy:/home/student/ex4 remote_sshfs_ex4
 sshfs sdnfp04_proxy:/opt/floodlight/src/main/java/net/sdnlab/ex4 remote_java_ex4
 
 sudo reboot
+
+/opt/floodlight/floodlight-noforwarding.sh
 ```
 
 Others

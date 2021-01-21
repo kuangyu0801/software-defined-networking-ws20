@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.MappingJsonFactory;
  */
 public class Subscription {
 	
-	protected static Logger logger = LoggerFactory.getLogger(Task43.class);
+	protected static Logger logger = LoggerFactory.getLogger(Subscription.class);
     private int udpPort;
     private int type; // measurement type: 0: energy, 1: power
     private int rVal; // reference value
@@ -118,15 +118,15 @@ public class Subscription {
 			jp.nextToken();
 			
 			if (n.equals(Task43.Columns.COLUMN_FILTER_ENALBE)) {
-				isFiltered = jp.getBooleanValue();
+				isFiltered = Boolean.parseBoolean(jp.getText());
 			} else if (n.equals(Task43.Columns.COLUMN_UDP_PORT)) {
-				udpPort = jp.getIntValue();
+				udpPort = Integer.parseInt(jp.getText());
 			} else if (n.equals(Task43.Columns.COLUMN_TYPE)) {
-				type = jp.getIntValue();
+				type = Integer.parseInt(jp.getText());
 			} else if (n.equals(Task43.Columns.COLUMN_REFERENCE_VALUE)) {
-				rVal = jp.getIntValue();
+				rVal = Integer.parseInt(jp.getText());
 			} else if (n.equals(Task43.Columns.COLUMN_IS_GREATER)) {
-				isGreater = jp.getBooleanValue();
+				isGreater = Boolean.parseBoolean(jp.getText());
 			}
 		}
 		logger.info("Create new Subscription " + "UDP port: " + udpPort + ", Type: " + ((type == 0) ? "Energy" : "Power") +
