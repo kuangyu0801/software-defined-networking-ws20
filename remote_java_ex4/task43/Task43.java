@@ -1,6 +1,5 @@
 package net.sdnlab.ex4.task43;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonEncoding;
 
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFSwitch;
@@ -65,14 +63,10 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	}
 	
 	private Map<String, Subscription> subMap = new HashMap<>();
-	private List<Subscription> type0_greaterList = new ArrayList<>();
-	private List<Subscription> type0_lessList = new ArrayList<>();
-	private List<Subscription> type1_greaterList = new ArrayList<>();
-	private List<Subscription> type1_lessList = new ArrayList<>();
-	Map<IOFSwitch, List<OFFlowAdd>> deleteMap1 = new HashMap<>();
-	Map<IOFSwitch, List<OFFlowAdd>> deleteMap2 = new HashMap<>();
-	Map<IOFSwitch, List<OFFlowAdd>> deleteMap3 = new HashMap<>();
-	Map<IOFSwitch, List<OFFlowAdd>> deleteMap4 = new HashMap<>();
+	private List<Subscription> [] lessListArr = new List[]{new ArrayList<>(), new ArrayList<>()}; // 0:type-0, 1:type-1
+	private List<Subscription> [] greaterListArr = new List[]{new ArrayList<>(), new ArrayList<>()}; // new List<Subscription>[]{new ArrayList<>(), new ArrayList<>()}; // 0:type-0, 1:type-1
+	Map<IOFSwitch, List<OFFlowAdd>>[] lessDelMapArr = new Map[]{new HashMap<>(), new HashMap<>()}; // 0:type-0, 1:type-1
+	Map<IOFSwitch, List<OFFlowAdd>>[] greaterDelMapArr = new Map[]{new HashMap<>(), new HashMap<>()}; // 0:type-0, 1:type-1
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -112,6 +106,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	@Override
 	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
 		restApiService.addRestletRoutable(new Task43WebRoutable());
+		setIpTable();
 	}
 
 	@Override
@@ -196,32 +191,16 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	private void installFlow(String name, Subscription sub) {
 
 		// classify the subscriptions according to the type and comparator
-		if(sub.getType()==0 && sub.isGreater()){
-			logger.info("install for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
-			type0_greaterList.add(sub);	
-			deleteFlow(deleteMap1);
-			installGreater(type0_greaterList, deleteMap1);
-		}else if(sub.getType()==0 && !sub.isGreater()){
-			logger.info("install for "+name+" <= " + sub.getrVal()+"type: " + sub.getType());
-			type0_lessList.add(sub);
-			deleteFlow(deleteMap2);
-			installLessEqual(type0_lessList, deleteMap2);
-		}else if(sub.getType()==1 && sub.isGreater()){
-			logger.info("install for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
-			type1_greaterList.add(sub);
-			deleteFlow(deleteMap3);
-			installGreater(type1_greaterList, deleteMap3);
-		}else if(sub.getType()==1 && !sub.isGreater()){
-			logger.info("install for "+name+" <= " + sub.getrVal()+"type: " + sub.getType());
-			type1_lessList.add(sub);
-			deleteFlow(deleteMap4);
-			installLessEqual(type1_lessList, deleteMap4);
-		}
-	}
-	
-	// TODO: complete method
-	private void createFlow(String name, Subscription sub) {
-
+		Map<IOFSwitch, List<OFFlowAdd>> delMap = (sub.isGreater()) ? greaterDelMapArr[sub.getType()] : lessDelMapArr[sub.getType()];
+		List<Subscription> installList = (sub.isGreater()) ? greaterListArr[sub.getType()] : lessListArr[sub.getType()];
+		logger.info("install for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
+			installList.add(sub);
+			deleteFlow(delMap);
+			if (sub.isGreater()) {
+				installGreater(installList, delMap);
+			} else {
+				installLessEqual(installList, delMap);
+			}
 	}
 
 	private void installGreater(List<Subscription> greaterList, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
@@ -232,47 +211,44 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		List<OFFlowAdd> deleteS1List = new ArrayList<>();
 		List<OFFlowAdd> deleteS2List = new ArrayList<>();
 		List<OFFlowAdd> deleteS3List = new ArrayList<>();
-		for(int i=0; i<=greaterList.size();i++){
-			if (i==0){
-				installs1(greaterList.get(0), priority,deleteS1List,deleteMap);
-			}else if(i==greaterList.size()){
-				String ipv4AddressWithMask = "230."+greaterList.get(i-1).getType()+".0.0/16";
-				dstList.add(greaterList.get(i-1));
-				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
-			}else{
-				String ipv4AddressWithMask = greaterList.get(i).computeMask(); //500
-				dstList.add(greaterList.get(i-1)); //x
-				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
-				priority--;
+		// need to install 1 addtional flow: rest flow (ex. > 100 need to install drop when  <= 63, and all pass flow
+		for(int i = 0; i <= greaterList.size(); i += 1){
+			if (i == 0){
+				installOnS1(greaterList.get(0), priority,deleteS1List,deleteMap);
+			} else {
+				String ipv4AddressWithMask = (i == greaterList.size()) ? "230." + greaterList.get(i - 1).getType() + ".0.0/16"
+						: greaterList.get(i).computeMask();
+				dstList.add(greaterList.get(i - 1)); //x
+				installOnS2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
+				priority -= 1;
 			}
 		}
-		installs3(deleteS3List,deleteMap);
+		installOnS3(deleteS3List,deleteMap);
 	}
 	
 	private void installLessEqual(List<Subscription> lessList, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+		//Sorts the subscription list into ascending order, according to the reference value
 		Collections.sort(lessList);
 		int priority = 500;
 		List<Subscription> dstList = new ArrayList<Subscription>();
 		List<OFFlowAdd> deleteS1List = new ArrayList<>();
 		List<OFFlowAdd> deleteS2List = new ArrayList<>();
 		List<OFFlowAdd> deleteS3List = new ArrayList<>();
-		for(int i=lessList.size()-1; i>=0;i--){
-			if (i==lessList.size()-1){
-				installs1(lessList.get(i), priority,deleteS1List,deleteMap);
-				String ipv4AddressWithMask = lessList.get(i).computeMask();
-				dstList.add(lessList.get(i));
-				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
-			}else{
-				priority++;
-				String ipv4AddressWithMask = lessList.get(i).computeMask();
-				dstList.add(lessList.get(i));
-				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
+		for (int i = lessList.size() - 1; i >= 0; i -= 1){
+			// install only the largest upper bound on S1
+			if (i == lessList.size() - 1) {
+				installOnS1(lessList.get(i), priority,deleteS1List,deleteMap);
 			}
+
+			String ipv4AddressWithMask = lessList.get(i).computeMask();
+			dstList.add(lessList.get(i));
+			installOnS2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
+			priority += 1;
 		}
-		installs3(deleteS3List,deleteMap);
+		installOnS3(deleteS3List,deleteMap);
 	}
 
-	public void installs1(Subscription sub, int priority, List<OFFlowAdd> deleteS1List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+	public void installOnS1(Subscription sub, int priority, List<OFFlowAdd> deleteS1List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
 		logger.info("install flow entries on s1");
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
 		IOFSwitch s1 = switchService.getSwitch(DatapathId.of(1));
@@ -327,7 +303,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		deleteMap.put(s1, deleteS1List);
 	}
 
-	public void installs2(String ipv4AddressWithMask, int priority, List<Subscription> dstList, List<OFFlowAdd> deleteS2List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+	public void installOnS2(String ipv4AddressWithMask, int priority, List<Subscription> dstList, List<OFFlowAdd> deleteS2List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
 		logger.info("install flow entries on s2");
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
 		OFOxms oxms = myFactory.oxms();
@@ -372,7 +348,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 			deleteMap.put(s2, deleteS2List);
 	}
 
-	public void installs3(List<OFFlowAdd> deleteS3List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+	public void installOnS3(List<OFFlowAdd> deleteS3List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
 		logger.info("install flow entries on s3");
 		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
 		IOFSwitch s3 = switchService.getSwitch(DatapathId.of(3));

@@ -16,7 +16,7 @@ curl -X POST -d '{"switch":"00:00:00:00:00:00:00:01", "name":"s1-arpRep-sub", "p
 # S1 forwards IP pakcet
 curl -X POST -d '{"switch":"00:00:00:00:00:00:00:01", "name":"s1-ip-root", "priority":"2", "eth_type":"0x0800", "ipv4_dst":"10.10.10.10", "active":"true", "actions":"output=3"}' http://localhost:8080/wm/staticentrypusher/json
 curl -X POST -d '{"switch":"00:00:00:00:00:00:00:01", "name":"s1-ip-pub", "priority":"2", "eth_type":"0x0800", "ipv4_dst":"10.1.0.1", "active":"true", "actions":"output=2"}' http://localhost:8080/wm/staticentrypusher/json
-curl -X POST -d '{"switch":"00:00:00:00:00:00:00:01", "name":"s1-ip-sub", "priority":"1", "eth_type":"0x0800", "active":"true", "actions":"output=1"}' http://localhost:8080/wm/staticentrypusher/json
+curl -X POST -d '{"switch":"00:00:00:00:00:00:00:01", "name":"s1-ip-sub", "priority":"1", "eth_type":"0x0800", "ipv4_dst":"10.0.0.0/8","active":"true", "actions":"output=1"}' http://localhost:8080/wm/staticentrypusher/json
 
 # S2 broadcasts ARP request
 curl -X POST -d '{"switch":"00:00:00:00:00:00:00:02", "name":"s2-arpReq", "priority":"1", "eth_type":"0x0806", "arp_opcode":"0x1", "active":"true", "actions":"output=flood"}' http://localhost:8080/wm/staticentrypusher/json
