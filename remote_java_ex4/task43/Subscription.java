@@ -17,7 +17,7 @@ import com.fasterxml.jackson.databind.MappingJsonFactory;
  * @author student
  * Class for manage subscription
  */
-public class Subscription {
+public class Subscription implements Comparable<Subscription>{
 	
 	protected static Logger logger = LoggerFactory.getLogger(Subscription.class);
     private int udpPort;
@@ -25,13 +25,15 @@ public class Subscription {
     private int rVal; // reference value
     private boolean isFiltered;
     private boolean isGreater; // comparator: true: greater than, false: less and equal
+	private String ipv4Address;
     
-    public Subscription(int udpPort, int type, int rVal, boolean isFiltered, boolean isGreater)  {
+    public Subscription(int udpPort, int type, int rVal, boolean isFiltered, boolean isGreater, String ipv4Address)  {
         this.setUdpPort(udpPort);
         this.setType(type);
         this.setrVal(rVal);
         this.setFiltered(isFiltered);
         this.setGreater(isGreater);
+        this.setIpv4Address(ipv4Address);
     }
 
 	public int getUdpPort() {
@@ -74,6 +76,14 @@ public class Subscription {
 		this.isGreater = isGreater;
 	}
 
+	public String getIpv4Address() {
+		return ipv4Address;
+	}
+
+	public void setIpv4Address(String ipv4Address) {
+		this.ipv4Address = ipv4Address;
+	}
+
 	/**
 	 *
 	 * @param fmJson
@@ -81,7 +91,7 @@ public class Subscription {
 	 * @throws IOException
 	 * reference: https://github.com/floodlight/floodlight/blob/d737cb05656a6038f4e2277ffb4503d45b7b29cb/src/main/java/net/floodlightcontroller/staticentry/StaticEntries.java#L109 
 	 */
-	public static Subscription jsonToSubscription(String fmJson) throws IOException {
+	public static Subscription jsonToSubscription(String fmJson, String ip) throws IOException {
 
 		MappingJsonFactory f = new MappingJsonFactory();
 		JsonParser jp = null;
@@ -131,7 +141,28 @@ public class Subscription {
 		}
 		logger.info("Create new Subscription " + "UDP port: " + udpPort + ", Type: " + ((type == 0) ? "Energy" : "Power") +
                 ", reference Value: " + rVal +  ", Filter: " + ((isFiltered) ? ("Enabled") : "Disabled") + ", Comparator: " + ((isGreater) ? ">": "<=" ));
-		Subscription sub = new Subscription(udpPort, type, rVal, isFiltered, isGreater);
+		Subscription sub = new Subscription(udpPort, type, rVal, isFiltered, isGreater, ip);
 		return sub;
+	}
+
+	@Override
+	public int compareTo(Subscription subscription) {
+		return this.rVal > subscription.rVal ? 1:-1;
+	}
+
+	public String computeMask(){
+		int mask = 16;
+		int ref = 0x8000;
+		int temp = this.rVal;
+		while((temp&=ref)==0){
+			temp=this.rVal;
+			ref>>=1;
+			mask++;
+		}
+		if (this.isGreater){
+			mask++;
+		}
+		String ipv4AddressWithMask = "230."+this.type+".0.0/"+mask;
+		return ipv4AddressWithMask;
 	}
 }

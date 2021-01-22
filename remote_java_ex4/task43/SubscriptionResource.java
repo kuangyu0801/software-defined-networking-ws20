@@ -13,10 +13,12 @@ public class SubscriptionResource extends ServerResource {
 		ITask43Service task43Service = (ITask43Service) getContext().getAttributes()
 				.get(ITask43Service.class.getCanonicalName());
 		String name = (String) getRequestAttributes().get("name");
+		String subIP = (String) getRequest().getClientInfo().getAddress();
+		System.out.println("Subscriber IP address: "+subIP);
 		Subscription sub = null;
 		// DONE: parse JSON
 		try {
-			sub = Subscription.jsonToSubscription(json);
+			sub = Subscription.jsonToSubscription(json,subIP);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
