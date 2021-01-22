@@ -51,6 +51,9 @@ java Subscriber 50004 0 136 all gt
 - host application:
     - update your subscriber application to use this REST- interface to register subscriptions!
         + java application http方法調用
+            + https://github.com/FasterXML/jackson-core/releases
+            + http://tutorials.jenkov.com/java-json/jackson-installation.html
+            + https://openjdk.java.net/
         + optional: java 如何在run的時候得到新的update(多線程調用)
 - 測試方法：
     + floodlight controller: 透過curl直接運行jason file
@@ -78,6 +81,15 @@ OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
 ```
 - Java JSON: http://tutorials.jenkov.com/java-json/index.html
 
+# Complexity Anaylsis
+- N is number of host
+- W/flow Priority: 
+- Space Complexity(Traffic) Complexity: O(1)
+- Time Complexity(): O(NlongN) from sorting
+
+- W/out flow priority:
+    - Space:O(N)
+    - Time Complexity: O(N)
 
 
 ```
