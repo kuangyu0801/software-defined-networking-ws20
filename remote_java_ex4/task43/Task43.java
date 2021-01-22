@@ -5,9 +5,29 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.projectfloodlight.openflow.protocol.OFFactories;
+import org.projectfloodlight.openflow.protocol.OFFactory;
+import org.projectfloodlight.openflow.protocol.OFFlowAdd;
+import org.projectfloodlight.openflow.protocol.OFFlowDelete;
+import org.projectfloodlight.openflow.protocol.OFVersion;
+import org.projectfloodlight.openflow.protocol.action.OFAction;
+import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.action.OFActionSetField;
+import org.projectfloodlight.openflow.protocol.match.Match;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
+import org.projectfloodlight.openflow.protocol.oxm.OFOxms;
+import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.EthType;
+import org.projectfloodlight.openflow.types.IPv4Address;
+import org.projectfloodlight.openflow.types.IPv4AddressWithMask;
+import org.projectfloodlight.openflow.types.IpProtocol;
+import org.projectfloodlight.openflow.types.OFPort;
+import org.projectfloodlight.openflow.types.TransportPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,16 +36,21 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonEncoding;
 
 import net.floodlightcontroller.core.IFloodlightProviderService;
+import net.floodlightcontroller.core.IOFSwitch;
+import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.restserver.IRestApiService;
+import net.floodlightcontroller.util.FlowModUtils;
 
 public class Task43 implements IFloodlightModule, ITask43Service {
 
 	protected IFloodlightProviderService floodlightProvider;
 	protected IRestApiService restApiService;
+	protected IOFSwitchService switchService;
+	private Map<IPv4Address,OFPort> ipToSwPortMap;
 
 	// TODO: add any other required services
 
@@ -40,6 +65,14 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	}
 	
 	private Map<String, Subscription> subMap = new HashMap<>();
+	private List<Subscription> type0_greaterList = new ArrayList<>();
+	private List<Subscription> type0_lessList = new ArrayList<>();
+	private List<Subscription> type1_greaterList = new ArrayList<>();
+	private List<Subscription> type1_lessList = new ArrayList<>();
+	Map<IOFSwitch, List<OFFlowAdd>> deleteMap1 = new HashMap<>();
+	Map<IOFSwitch, List<OFFlowAdd>> deleteMap2 = new HashMap<>();
+	Map<IOFSwitch, List<OFFlowAdd>> deleteMap3 = new HashMap<>();
+	Map<IOFSwitch, List<OFFlowAdd>> deleteMap4 = new HashMap<>();
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -60,9 +93,8 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		Collection<Class<? extends IFloodlightService>> deps = new ArrayList<Class<? extends IFloodlightService>>();
 		deps.add(IFloodlightProviderService.class);
 		deps.add(IRestApiService.class);
-
 		// TODO: add any other required service dependencies
-
+		deps.add(IOFSwitchService.class);
 		return deps;
 	}
 
@@ -72,7 +104,8 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		restApiService = context.getServiceImpl(IRestApiService.class);
 
 		// TODO: initialize any other required services
-
+		switchService = context.getServiceImpl(IOFSwitchService.class);
+		
 		logger = LoggerFactory.getLogger(Task43.class);
 	}
 
@@ -136,21 +169,243 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		} else {
 			status = "Successfully added new subscription " + name;
 			subMap.put(name, sub);
-			createFlow(name, sub);
+//			createFlow(name, sub);
+			// TODO: change method call to init
+			setIpTable();
 			installFlow(name, sub);
 		}
 		 
 		return "{\"status\":\"" + status + "\"}";
 	}
+	
+	private void deleteFlow(Map<IOFSwitch, List<OFFlowAdd>> deleteMap) {
+		logger.info("delete content-based flows");	
+		if(!deleteMap.isEmpty()) {
+			for(IOFSwitch sw: deleteMap.keySet()) {
+				List<OFFlowAdd> deleteList = deleteMap.get(sw);
+				for(OFFlowAdd flowAdd: deleteList) {
+					OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
+					sw.write(flowDelete);
+				}
+			}
+		deleteMap.clear();
+		}
+	}
 
-	// TODO: complete method
+	// TODO: complete method, refactor and combine case to get rid of if-else
 	private void installFlow(String name, Subscription sub) {
-		
+
+		// classify the subscriptions according to the type and comparator
+		if(sub.getType()==0 && sub.isGreater()){
+			logger.info("install for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
+			type0_greaterList.add(sub);	
+			deleteFlow(deleteMap1);
+			installGreater(type0_greaterList, deleteMap1);
+		}else if(sub.getType()==0 && !sub.isGreater()){
+			logger.info("install for "+name+" <= " + sub.getrVal()+"type: " + sub.getType());
+			type0_lessList.add(sub);
+			deleteFlow(deleteMap2);
+			installLessEqual(type0_lessList, deleteMap2);
+		}else if(sub.getType()==1 && sub.isGreater()){
+			logger.info("install for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
+			type1_greaterList.add(sub);
+			deleteFlow(deleteMap3);
+			installGreater(type1_greaterList, deleteMap3);
+		}else if(sub.getType()==1 && !sub.isGreater()){
+			logger.info("install for "+name+" <= " + sub.getrVal()+"type: " + sub.getType());
+			type1_lessList.add(sub);
+			deleteFlow(deleteMap4);
+			installLessEqual(type1_lessList, deleteMap4);
+		}
 	}
 	
 	// TODO: complete method
 	private void createFlow(String name, Subscription sub) {
-		
+
+	}
+
+	private void installGreater(List<Subscription> greaterList, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+		//Sorts the subscription list into ascending order, according to the reference value
+		Collections.sort(greaterList);
+		int priority = 100;
+		List<Subscription> dstList = new ArrayList<Subscription>();
+		List<OFFlowAdd> deleteS1List = new ArrayList<>();
+		List<OFFlowAdd> deleteS2List = new ArrayList<>();
+		List<OFFlowAdd> deleteS3List = new ArrayList<>();
+		for(int i=0; i<=greaterList.size();i++){
+			if (i==0){
+				installs1(greaterList.get(0), priority,deleteS1List,deleteMap);
+			}else if(i==greaterList.size()){
+				String ipv4AddressWithMask = "230."+greaterList.get(i-1).getType()+".0.0/16";
+				dstList.add(greaterList.get(i-1));
+				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
+			}else{
+				String ipv4AddressWithMask = greaterList.get(i).computeMask(); //500
+				dstList.add(greaterList.get(i-1)); //x
+				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
+				priority--;
+			}
+		}
+		installs3(deleteS3List,deleteMap);
+	}
+	
+	private void installLessEqual(List<Subscription> lessList, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+		Collections.sort(lessList);
+		int priority = 500;
+		List<Subscription> dstList = new ArrayList<Subscription>();
+		List<OFFlowAdd> deleteS1List = new ArrayList<>();
+		List<OFFlowAdd> deleteS2List = new ArrayList<>();
+		List<OFFlowAdd> deleteS3List = new ArrayList<>();
+		for(int i=lessList.size()-1; i>=0;i--){
+			if (i==lessList.size()-1){
+				installs1(lessList.get(i), priority,deleteS1List,deleteMap);
+				String ipv4AddressWithMask = lessList.get(i).computeMask();
+				dstList.add(lessList.get(i));
+				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
+			}else{
+				priority++;
+				String ipv4AddressWithMask = lessList.get(i).computeMask();
+				dstList.add(lessList.get(i));
+				installs2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
+			}
+		}
+		installs3(deleteS3List,deleteMap);
+	}
+
+	public void installs1(Subscription sub, int priority, List<OFFlowAdd> deleteS1List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+		logger.info("install flow entries on s1");
+		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
+		IOFSwitch s1 = switchService.getSwitch(DatapathId.of(1));
+		Match match = myFactory.buildMatch()
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setMasked(MatchField.IPV4_DST, IPv4AddressWithMask.of(sub.computeMask()))
+				.build();
+//		OFFlowAdd flowAdd;
+		if(sub.isGreater()){
+			//">": set no action to drop the value below the reference value
+			OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+					.setPriority(priority)
+					.setMatch(match)
+					.build();
+			s1.write(flowAdd);
+			deleteS1List.add(flowAdd);
+			// let the rest pass
+			Match match_rest = myFactory.buildMatch()
+					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+					.setMasked(MatchField.IPV4_DST, IPv4AddressWithMask.of("230."+sub.getType()+".0.0/16"))
+					.build();
+			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+			OFActionOutput output = myFactory.actions().buildOutput()
+					.setMaxLen(0xFFffFFff)
+					.setPort(OFPort.of(1))
+					.build();
+			actionList.add(output);
+			OFFlowAdd flowAdd_rest = myFactory.buildFlowAdd()
+					.setPriority(priority-1)
+					.setMatch(match_rest)
+					.setActions(actionList)
+					.build();
+			s1.write(flowAdd_rest);
+			deleteS1List.add(flowAdd_rest);
+		}else{
+			// "<=": forward
+			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+			OFActionOutput output = myFactory.actions().buildOutput()
+					.setMaxLen(0xFFffFFff)
+					.setPort(OFPort.of(1))
+					.build();
+			actionList.add(output);
+			//add a flow entry
+			OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+					.setPriority(priority)
+					.setMatch(match)
+					.setActions(actionList)
+					.build();
+			s1.write(flowAdd);
+			deleteS1List.add(flowAdd);
+		}
+		deleteMap.put(s1, deleteS1List);
+	}
+
+	public void installs2(String ipv4AddressWithMask, int priority, List<Subscription> dstList, List<OFFlowAdd> deleteS2List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+		logger.info("install flow entries on s2");
+		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
+		OFOxms oxms = myFactory.oxms();
+		IOFSwitch s2 = switchService.getSwitch(DatapathId.of(2));
+			// set match field
+			Match match = myFactory.buildMatch()
+					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+					.setMasked(MatchField.IPV4_DST, IPv4AddressWithMask.of(ipv4AddressWithMask))
+					.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
+					.build();
+			//set actions
+			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+			// iterate the subscribers who subscribe specific values
+			for(Subscription sub: dstList){
+				IPv4Address ipv4Dst = IPv4Address.of(sub.getIpv4Address());
+				TransportPort udpDst = TransportPort.of(sub.getUdpPort());
+				// Use OXM to modify network layer dest field
+				OFActionSetField setNwIpDst = myFactory.actions().buildSetField()
+						.setField(oxms.buildIpv4Dst().setValue(ipv4Dst).build())
+						.build();
+				// reset upd dst port
+				OFActionSetField setNwUdpDst = myFactory.actions().buildSetField()
+						.setField(oxms.buildUdpDst().setValue(udpDst).build())
+						.build();
+				// set output
+				OFActionOutput output = myFactory.actions().buildOutput()
+						.setMaxLen(0xFFffFFff)
+						.setPort(ipToSwPortMap.get(ipv4Dst))
+						.build();
+				actionList.add(setNwIpDst);
+				actionList.add(setNwUdpDst);
+				actionList.add(output);
+			}
+			//add a flow entry
+			OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+					.setPriority(priority)
+					.setMatch(match)
+					.setActions(actionList)
+					.build();
+			s2.write(flowAdd);
+			deleteS2List.add(flowAdd);
+			deleteMap.put(s2, deleteS2List);
+	}
+
+	public void installs3(List<OFFlowAdd> deleteS3List, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
+		logger.info("install flow entries on s3");
+		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_14);
+		IOFSwitch s3 = switchService.getSwitch(DatapathId.of(3));
+		// set match field
+		Match match = myFactory.buildMatch()
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+				.setMasked(MatchField.IPV4_DST, IPv4AddressWithMask.of("230.0.0.0/8"))
+				.build();
+		// add actions
+		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+		// set output
+		OFActionOutput output = myFactory.actions().buildOutput()
+				.setMaxLen(0xFFffFFff)
+				.setPort(OFPort.of(2))
+				.build();
+		actionList.add(output);
+		//add a flow entry
+		OFFlowAdd flowAdd = myFactory.buildFlowAdd()
+				.setMatch(match)
+				.setActions(actionList)
+				.build();
+		s3.write(flowAdd);
+		deleteS3List.add(flowAdd);
+		deleteMap.put(s3, deleteS3List);
+	}
+
+	public void setIpTable(){
+		logger.info("initial ip to switchport table");
+		ipToSwPortMap = new HashMap<>();
+		ipToSwPortMap.put(IPv4Address.of("10.1.1.1"),OFPort.of(3));
+		ipToSwPortMap.put(IPv4Address.of("10.1.1.2"),OFPort.of(2));
+		ipToSwPortMap.put(IPv4Address.of("10.1.1.3"),OFPort.of(4));
+		ipToSwPortMap.put(IPv4Address.of("10.1.1.4"),OFPort.of(5));
 	}
 
 	@Override
