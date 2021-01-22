@@ -133,7 +133,7 @@ public class Subscription implements Comparable<Subscription>{
 				udpPort = Integer.parseInt(jp.getText());
 			} else if (n.equals(Task43.Columns.COLUMN_TYPE)) {
 				type = Integer.parseInt(jp.getText());
-			} else if (n.equals(Task43.Columns.COLUMN_REFERENCE_VALUE)) {
+	 		} else if (n.equals(Task43.Columns.COLUMN_REFERENCE_VALUE)) {
 				rVal = Integer.parseInt(jp.getText());
 			} else if (n.equals(Task43.Columns.COLUMN_IS_GREATER)) {
 				isGreater = Boolean.parseBoolean(jp.getText());
@@ -150,6 +150,12 @@ public class Subscription implements Comparable<Subscription>{
 		return this.rVal > subscription.rVal ? 1:-1;
 	}
 
+	/**
+	 * compute subnet mask according to isGreater
+	 * if greater: need to compute ceiling(rVal)
+	 * if less equal: floor(rVal)
+	 * @return
+	 */
 	public String computeMask(){
 		int mask = 16;
 		int ref = 0x8000;
