@@ -44,7 +44,7 @@ java Subscriber 50004 0 136 all gt
 - floodlight controller:
     - requirement:
         + POST: parsing all field, record, (generate + install all flows)
-        + DELETE: erase all flows, take out the generate a new flow, turn them into deleteFlow, and install it
+        + DELETE: erase all flows, take out the generated new flow, turn them into deleteFlow, and install it
         + GET: return a json file, taking all the subscriptions and serialize it into a JSON file
     - side note:
         + 因為沒有update, 所以我們只需要把整個flow覆蓋掉即可    
@@ -54,7 +54,10 @@ java Subscriber 50004 0 136 all gt
             + https://github.com/FasterXML/jackson-core/releases
             + http://tutorials.jenkov.com/java-json/jackson-installation.html
             + https://openjdk.java.net/
+            + Java使用 curl: https://www.baeldung.com/java-curl
+                + https://github.com/eugenp/tutorials/blob/master/core-java-modules/core-java-networking-2/src/test/java/com/baeldung/curltojava/JavaCurlExamplesLiveTest.java
         + optional: java 如何在run的時候得到新的update(多線程調用)
+        
 - 測試方法：
     + floodlight controller: 透過curl直接運行jason file
     + subscriber application: 要在local先試過能不能reach到local host的content    
@@ -80,6 +83,9 @@ stpe9: wireshark監控“s1-eth3", 使用filter "http" (只有透過mininet發�
 OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
 ```
 - Java JSON: http://tutorials.jenkov.com/java-json/index.html
+- Add dependency in IntelliJ with .jar: https://www.jetbrains.com/help/idea/working-with-module-dependencies.html#add-a-new-dependency
+- Making a JSON POST Request With HttpURLConnection: https://www.baeldung.com/httpurlconnection-post
+    + https://github.com/eugenp/tutorials/blob/master/core-java-modules/core-java-networking-2/src/main/java/com/baeldung/urlconnection/PostJSONWithHttpURLConnection.java
 
 # Complexity Anaylsis
 - N is number of host
@@ -108,3 +114,10 @@ Others
 - https://medium.com/altcampus/how-to-merge-two-or-multiple-git-repositories-into-one-9f8a5209913f#id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjI1MmZjYjk3ZGY1YjZiNGY2ZDFhODg1ZjFlNjNkYzRhOWNkMjMwYzUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYmYiOjE2MTA1NTg4NDcsImF1ZCI6IjIxNjI5NjAzNTgzNC1rMWs2cWUwNjBzMnRwMmEyamFtNGxqZGNtczAwc3R0Zy5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsInN1YiI6IjEwODcyMTYzNTA3OTY4MjM2Nzc2NiIsImVtYWlsIjoia3Vhbmd5dS5sdW1pZXJlLmxpQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJhenAiOiIyMTYyOTYwMzU4MzQtazFrNnFlMDYwczJ0cDJhMmphbTRsamRjbXMwMHN0dGcuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJuYW1lIjoiS1VBTkctWVUgTEkiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tLy1iLW1RNkpzNVpxSS9BQUFBQUFBQUFBSS9BQUFBQUFBQUFBQS9BTVp1dWNsWEtZb0pvZm9WUkI3SkRJcnJLNUJRblJXdFlBL3M5Ni1jL3Bob3RvLmpwZyIsImdpdmVuX25hbWUiOiJLVUFORy1ZVSIsImZhbWlseV9uYW1lIjoiTEkiLCJpYXQiOjE2MTA1NTkxNDcsImV4cCI6MTYxMDU2Mjc0NywianRpIjoiZjg2Y2E5N2FlMmJkYTI4ZTIwY2Q0YTJhNzM0NjQwOWMxNDFjNmFmYiJ9.A-rlY3t9fEImYYPBmX6qQ_1oJR27DGIgOaSrvE7D37pAbceTytcU9gm8VqKgwv5bJkannqE8AK0mBXB793FU98sukC43Y0llssvyZRaYZvXSAckfaPwHgAJqr49HJOWXha7HKXgdluHBDU0pDqm-xeJtYaGFgiZ-pWQ-xyxiNSgBtQa9tqjjkTZ42Oee62iJ_UEGvoP18wQH4YQbf5HcLMPhDfqqdRAWw8VCtgD4HtLdO4zH_Wz9evDnV73nacD8Q9B5auChkLLivf3DRM3ImfgDZWG2nb19BS9sS_d36GN_EMvtoHjx78KqXtjM7_9TOGJjtWwHk-9zempcK9F0iw
 - https://www.jetbrains.com/help/idea/working-with-code-documentation.html#auto-comment
  /** before a declaration and press ⏎
+ 
+ # Curiosity
+ - JSON 的確切格式到底是怎麼樣
+ - OutputStream, InputStream, Writer這些東西的到底是什麼？
+ - UDP實際上的使用
+ - HTTP, REST API
+    - URI in a POST identifies the resource (i.e. the service) that will handle the enclosed entity
