@@ -29,6 +29,9 @@ curl -X POST -d '{"switch":"00:00:00:00:00:00:00:02", "name":"s2-sub4", "priorit
 curl -X POST -d '{"switch":"00:00:00:00:00:00:00:02", "name":"s2-arpRep-root", "priority":"1", "eth_type":"0x0806","arp_opcode":"0x2", "arp_tpa":"10.10.10.10", "active":"true", "actions":"output=1"}' http://localhost:8080/wm/staticentrypusher/json
 curl -X POST -d '{"switch":"00:00:00:00:00:00:00:02", "name":"s2-ip-root", "priority":"1", "eth_type":"0x0800", "ipv4_dst":"10.10.10.10", "active":"true", "actions":"output=1"}' http://localhost:8080/wm/staticentrypusher/json
 
-# S3 forwards ARP request/ARP reply/IP packet, use IN_PORT as match
-curl -X POST -d '{"switch":"00:00:00:00:00:00:00:03", "name":"s3-sub2", "priority":"1", "in_port":"1", "active":"true", "actions":"output=2"}' http://localhost:8080/wm/staticentrypusher/json
-curl -X POST -d '{"switch":"00:00:00:00:00:00:00:03", "name":"s3-other", "priority":"1", "in_port":"2", "active":"true", "actions":"output=1"}' http://localhost:8080/wm/staticentrypusher/json
+# S3 forwards ARP request/ARP reply/IP packet
+curl -X POST -d '{"switch":"00:00:00:00:00:00:00:03", "name":"s3-arpReq", "priority":"1", "eth_type":"0x0806", "arp_opcode":"0x1", "active":"true", "actions":"output=flood"}' http://localhost:8080/wm/staticentrypusher/json
+curl -X POST -d '{"switch":"00:00:00:00:00:00:00:03", "name":"s3-arpRep-sub2", "priority":"2", "eth_type":"0x0806","arp_opcode":"0x2", "arp_tpa":"10.1.1.2", "active":"true", "actions":"output=2"}' http://localhost:8080/wm/staticentrypusher/json
+curl -X POST -d '{"switch":"00:00:00:00:00:00:00:03", "name":"s3-arpRep-other", "priority":"1", "eth_type":"0x0806","arp_opcode":"0x2", "active":"true", "actions":"output=1"}' http://localhost:8080/wm/staticentrypusher/json
+curl -X POST -d '{"switch":"00:00:00:00:00:00:00:03", "name":"s3-ip-sub2", "priority":"2", "eth_type":"0x0800", "ipv4_dst":"10.1.1.2", "active":"true", "actions":"output=2"}' http://localhost:8080/wm/staticentrypusher/json
+curl -X POST -d '{"switch":"00:00:00:00:00:00:00:03", "name":"s3-ip-other", "priority":"1", "eth_type":"0x0800", "ipv4_dst":"10.0.0.0/8", "active":"true", "actions":"output=1"}' http://localhost:8080/wm/staticentrypusher/json

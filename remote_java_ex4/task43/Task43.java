@@ -129,6 +129,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 					// TODO: convert all types to String
 					if (subMap.get(name) != null) {
 						Subscription sub = subMap.get(name);
+						logger.info("Pringting subscription:" + name);
 						jGen.writeArrayFieldStart(name);
 						jGen.writeStartObject();
 						jGen.writeNumberField(Task43.Columns.COLUMN_UDP_PORT, sub.getUdpPort());
@@ -218,7 +219,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 			} else {
 				String ipv4AddressWithMask = (i == greaterList.size()) ? "230." + greaterList.get(i - 1).getType() + ".0.0/16"
 						: greaterList.get(i).computeMask();
-				dstList.add(greaterList.get(i - 1)); //x
+				dstList.add(greaterList.get(i - 1)); 
 				installOnS2(ipv4AddressWithMask, priority, dstList, deleteS2List, deleteMap);
 				priority -= 1;
 			}
@@ -392,18 +393,30 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		// DONE Implement!
 		if (subMap.containsKey(name)) {
 			status = "Successfully deleted subscription " + name;
-			subMap.remove(name);
 			deleteFlow(name);
+			subMap.remove(name);		
 		} else {
 			status = "Error! Subscription " + name + " does not exist";
 		}
 		return "{\"status\":\"" + status + "\"}";
 	}
 
-	// TODO: complete method
+	// DONE: complete method
 	private void deleteFlow(String name) {
-		
-		
+		Subscription sub = subMap.get(name);
+        // classify the subscriptions according to the type and comparator
+        Map<IOFSwitch, List<OFFlowAdd>> delMap = (sub.isGreater()) ? greaterDelMapArr[sub.getType()] : lessDelMapArr[sub.getType()];
+        List<Subscription> installList = (sub.isGreater()) ? greaterListArr[sub.getType()] : lessListArr[sub.getType()];
+        logger.info("delete flow for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
+        installList.remove(sub);
+        deleteFlow(delMap);
+        if(!installList.isEmpty()) {
+            if (sub.isGreater()) {
+                installGreater(installList, delMap);
+            } else {
+                installLessEqual(installList, delMap);
+            }	
+        }	
 	}
 
 }

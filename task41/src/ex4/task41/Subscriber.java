@@ -79,7 +79,6 @@ public class Subscriber {
         DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
         datagramSocket.receive(receivePacket);
         String receiveData = new String(receivePacket.getData());
-        System.out.println("[Subscriber][R]" + receiveData.trim());
         String[] infos = receiveData.split(",");
 
         int curValue = Integer.parseInt(infos[2]);
@@ -116,10 +115,8 @@ public class Subscriber {
 
     public static String post(String name, String udp, String type, String rval, boolean isFiltered, boolean isGreater) throws IOException {
         String json = "{\"udp_port\":\""  + udp + "\",\"type\":\"" + type + "\",\"filter_enable\":\"" + isFiltered + "\",\"reference_value\":\"" + rval  + "\",\"is_greater\":\"" + isGreater + "\"}";
-//      String command = "curl -X POST http://10.10.10.10:8080/subscriptions/" + name + "/json -d " + json;
 		String command = "curl -X POST -d " + json + " http://10.10.10.10:8080/subscriptions/" + name + "/json";
         System.out.println("Executing... " + command);
-        // curl -X POST -d '{"udp_port":"50001", "type":"0", "filter_enable":"true", "reference_value":"30", "is_greater":"false"}' http://10.10.10.10:8080/subscriptions/sub1/json
         Process process = Runtime.getRuntime().exec(command);
         consumeInputStream(process.getInputStream());
         return command;
