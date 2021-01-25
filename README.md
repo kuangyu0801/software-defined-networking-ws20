@@ -1,3 +1,6 @@
+# pdf
+- https://docs.google.com/document/d/16rlIwmSmP3yC4BlgtK_izt-25Iqj5b1EXPFMlhHW-3k/edit
+
 # TOD0
 - finish task 4.1 for parsing and min/max
 
@@ -66,6 +69,16 @@ java Subscriber 50004 0 136 all gt
 providing the following REST interface:
 - Floodlight Tutorial: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/15040589/How+to+add+a+REST+API+to+a+Module
 - Floodlight delete flow: https://floodlight.atlassian.net/wiki/spaces/floodlightcontroller/pages/1343547/How+to+use+OpenFlowJ-Loxigen
+    +  必須使用delete strict 才不會誤刪
+    
+```
+A side note about "strict": according to OpenFlow specification, the flow modification message and flow deletion message support a "strict" version and a "without strict" version. 
+A "strict" means any flow that exactly looks like the match you specify, then the flow(s) will be modified or deleted. 
+While if you choose a version "without strict", it means any flow that look like the match you specify 
+(i.e. the flow contains at least the match you specify, but could contains more match fields) will be modified or deleted. 
+
+```    
+    
 - JSON Parser: https://github.com/FasterXML/jackson-databind
 - Java 实现 HTTP 请求的三种方式: https://zhuanlan.zhihu.com/p/69285935
 # execution step

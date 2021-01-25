@@ -13,6 +13,7 @@ import org.projectfloodlight.openflow.protocol.OFFactories;
 import org.projectfloodlight.openflow.protocol.OFFactory;
 import org.projectfloodlight.openflow.protocol.OFFlowAdd;
 import org.projectfloodlight.openflow.protocol.OFFlowDelete;
+import org.projectfloodlight.openflow.protocol.OFFlowDeleteStrict;
 import org.projectfloodlight.openflow.protocol.OFVersion;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
@@ -65,8 +66,8 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	private Map<String, Subscription> subMap = new HashMap<>();
 	private List<Subscription> [] lessListArr = new List[]{new ArrayList<>(), new ArrayList<>()}; // 0:type-0, 1:type-1
 	private List<Subscription> [] greaterListArr = new List[]{new ArrayList<>(), new ArrayList<>()}; // new List<Subscription>[]{new ArrayList<>(), new ArrayList<>()}; // 0:type-0, 1:type-1
-	Map<IOFSwitch, List<OFFlowAdd>>[] lessDelMapArr = new Map[]{new HashMap<>(), new HashMap<>()}; // 0:type-0, 1:type-1
-	Map<IOFSwitch, List<OFFlowAdd>>[] greaterDelMapArr = new Map[]{new HashMap<>(), new HashMap<>()}; // 0:type-0, 1:type-1
+	private Map<IOFSwitch, List<OFFlowAdd>>[] lessDelMapArr = new Map[]{new HashMap<>(), new HashMap<>()}; // 0:type-0, 1:type-1
+	private Map<IOFSwitch, List<OFFlowAdd>>[] greaterDelMapArr = new Map[]{new HashMap<>(), new HashMap<>()}; // 0:type-0, 1:type-1
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -165,7 +166,6 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		} else {
 			status = "Successfully added new subscription " + name;
 			subMap.put(name, sub);
-//			createFlow(name, sub);
 			// TODO: change method call to init
 			setIpTable();
 			installFlow(name, sub);
@@ -178,10 +178,21 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		logger.info("delete content-based flows");	
 		if(!deleteMap.isEmpty()) {
 			for(IOFSwitch sw: deleteMap.keySet()) {
-				List<OFFlowAdd> deleteList = deleteMap.get(sw);
-				for(OFFlowAdd flowAdd: deleteList) {
-					OFFlowDelete flowDelete = FlowModUtils.toFlowDelete(flowAdd);
-					sw.write(flowDelete);
+				if(!sw.getId().equals(DatapathId.of(3))) {
+					List<OFFlowAdd> deleteList = deleteMap.get(sw);
+					for(OFFlowAdd flowAdd: deleteList) {
+						OFFlowDeleteStrict flowDelete = FlowModUtils.toFlowDeleteStrict(flowAdd);
+						logger.info("delete flow: "+flowDelete.toString());	
+						sw.write(flowDelete);
+					}
+				}else if(subMap.isEmpty()) {
+					// delete flow on S3 when there is no subscription
+					List<OFFlowAdd> deleteList = deleteMap.get(sw);
+					for(OFFlowAdd flowAdd: deleteList) {
+						OFFlowDeleteStrict flowDelete = FlowModUtils.toFlowDeleteStrict(flowAdd);
+						logger.info("delete flow on S3: "+flowDelete.toString());	
+						sw.write(flowDelete);
+					}
 				}
 			}
 		deleteMap.clear();
@@ -194,7 +205,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		// classify the subscriptions according to the type and comparator
 		Map<IOFSwitch, List<OFFlowAdd>> delMap = (sub.isGreater()) ? greaterDelMapArr[sub.getType()] : lessDelMapArr[sub.getType()];
 		List<Subscription> installList = (sub.isGreater()) ? greaterListArr[sub.getType()] : lessListArr[sub.getType()];
-		logger.info("install for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
+		logger.info("install for "+name+" isGreater: "+sub.isGreater() + " value: "+sub.getrVal()+" type: " + sub.getType());
 			installList.add(sub);
 			deleteFlow(delMap);
 			if (sub.isGreater()) {
@@ -202,6 +213,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 			} else {
 				installLessEqual(installList, delMap);
 			}
+			
 	}
 
 	private void installGreater(List<Subscription> greaterList, Map<IOFSwitch, List<OFFlowAdd>> deleteMap){
@@ -257,7 +269,6 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 				.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				.setMasked(MatchField.IPV4_DST, IPv4AddressWithMask.of(sub.computeMask()))
 				.build();
-//		OFFlowAdd flowAdd;
 		if(sub.isGreater()){
 			//">": set no action to drop the value below the reference value
 			OFFlowAdd flowAdd = myFactory.buildFlowAdd()
@@ -394,7 +405,7 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 		if (subMap.containsKey(name)) {
 			status = "Successfully deleted subscription " + name;
 			deleteFlow(name);
-			subMap.remove(name);		
+//			subMap.remove(name);		
 		} else {
 			status = "Error! Subscription " + name + " does not exist";
 		}
@@ -404,12 +415,15 @@ public class Task43 implements IFloodlightModule, ITask43Service {
 	// DONE: complete method
 	private void deleteFlow(String name) {
 		Subscription sub = subMap.get(name);
+		subMap.remove(name);
         // classify the subscriptions according to the type and comparator
         Map<IOFSwitch, List<OFFlowAdd>> delMap = (sub.isGreater()) ? greaterDelMapArr[sub.getType()] : lessDelMapArr[sub.getType()];
         List<Subscription> installList = (sub.isGreater()) ? greaterListArr[sub.getType()] : lessListArr[sub.getType()];
-        logger.info("delete flow for "+name+" > " + sub.getrVal()+"type: " + sub.getType());
+        logger.info("delete flow for "+name+" isGreater: "+sub.isGreater()+" value: " + sub.getrVal()+" type: " + sub.getType());
         installList.remove(sub);
+        // uninstall all existing flows
         deleteFlow(delMap);
+        // reinstall new flows excluding deleted subscription
         if(!installList.isEmpty()) {
             if (sub.isGreater()) {
                 installGreater(installList, delMap);
