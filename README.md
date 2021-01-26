@@ -31,10 +31,15 @@ java Subscriber 50004 0 136 all gt
 ```
 - Runtime.getRuntime().addShutdownHook 使用实例
     + https://blog.csdn.net/HeatDeath/article/details/81668406
+- UDP package size: 1500
+    + https://juejin.cn/post/6844903638423306253
 
 # 4.2 – Content-based Routing
 
 # 4.3 – REST Interface for Content-based Routing
+
+這題其實可以reduce成 bfs + merge intervals
+
 ## Open issue
 - 同一個host重複訂閱我們要怎樣處理
     + 不允許重複訂閱（implicitly 只允許

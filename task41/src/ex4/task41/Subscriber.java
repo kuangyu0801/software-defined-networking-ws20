@@ -75,7 +75,8 @@ public class Subscriber {
 
 
     private void receive() throws IOException {
-        byte[] receiveBuffer = new byte[1024];
+        // MTU of UDP package is 1500
+        byte[] receiveBuffer = new byte[1500];
         DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
         datagramSocket.receive(receivePacket);
         String receiveData = new String(receivePacket.getData());
