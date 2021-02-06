@@ -24,11 +24,9 @@ srv_to_inet = match(srcip=ip_srv, dstip=ip_inet) >> fwd(5)
 h1_to_srv_ssh = match(srcip=ip_h1, dstip=ip_srv, dstport=9090, ethtype=packet.IPV4, protocol=packet.TCP_PROTO) >> fwd(4)
 h1_to_inet = match(srcip=ip_h1, dstip=ip_inet, dstport=8080, ethtype=packet.IPV4, protocol=packet.TCP_PROTO) >> fwd(5)
 inet_to_h1 = match(srcip=ip_inet, dstip=ip_h1) >> fwd(1)
-# mon prints every access to the ssh service on srv as well as all traffic from h2
-ssh_to_mon = match(dstip=ip_srv, dstport=9090, ethtype=packet.IPV4, protocol=packet.TCP_PROTO) >> fwd(3)
-h2_to_mon = match(srcip=ip_h2) >> fwd(3)
 
-firewall = all_to_srv_web + srv_to_h1 + srv_to_h2 + srv_to_inet + h1_to_srv_ssh + h1_to_inet + inet_to_h1 + ssh_to_mon + h2_to_mon + arp
+firewall = all_to_srv_web + srv_to_h1 + srv_to_h2 + srv_to_inet + h1_to_srv_ssh + h1_to_inet + inet_to_h1 + arp
+
 def main():
 
     return firewall
