@@ -13,7 +13,9 @@ ip_h2 = IPAddr('10.0.0.2')
 ip_mon = IPAddr('10.0.0.3')
 ip_srv = IPAddr('10.0.0.4')
 ip_inet = IPAddr('10.0.0.5')
+# h1-srv, h1-inet
 policy_h1_pass = (match(srcip=ip_h1, dstip=ip_srv) >> fwd(4)) + (match(srcip=ip_h1, dstip=ip_inet) >> fwd(5))
+# h2-srv, h2-inet
 policy_h2_pass = (match(srcip=ip_h2, dstip=ip_srv) >> fwd(4)) + (match(srcip=ip_h2, dstip=ip_inet) >> fwd(5))
 
 class qos(DynamicPolicy):

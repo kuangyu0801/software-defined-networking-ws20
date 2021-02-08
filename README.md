@@ -40,6 +40,19 @@ On inet and srv
 ```
 
 # Task 5.3
+```
+pyretic.py –v low –m r0 monitor_firewall
+
+sudo ./mininet5.py mininet
+
+> startservers mininet
+
+> xterm h1 h2 srv inet mon
+```
+On h1, h2, and inet access web & ssh services through:
+```
+curl –sS –m 5 10.0.0.X:Y0Y0
+```
 # Task 5.4
 
 # Reference
