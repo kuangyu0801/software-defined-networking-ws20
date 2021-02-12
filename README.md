@@ -38,6 +38,7 @@ java Subscriber 50004 0 136 all gt
 
 # 4.3 – REST Interface for Content-based Routing
 
+![avatar](picture/ER-diagram.png)
 這題其實可以reduce成 bfs + merge intervals
 
 ## Open issue
