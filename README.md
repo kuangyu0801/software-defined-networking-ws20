@@ -36,6 +36,9 @@ java Subscriber 50004 0 136 all gt
 
 # 4.2 – Content-based Routing
 
+- content-based filtering implemented by priority and subnet mask
+![avatar](picture/filtering-priority-subnet-mask.png) 
+
 # 4.3 – REST Interface for Content-based Routing
 
 ![avatar](picture/ER-diagram.png)
