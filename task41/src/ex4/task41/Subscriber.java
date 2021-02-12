@@ -54,6 +54,7 @@ public class Subscriber {
 
     public void listen() throws IOException {
         System.out.println("Listening");
+        // register a call back to print receiving summary when forced shutdown
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 try {
@@ -68,6 +69,8 @@ public class Subscriber {
                 }
             }
         });
+
+        // continues receiving UDP datagram
         while (true) {
             receive();
         }
