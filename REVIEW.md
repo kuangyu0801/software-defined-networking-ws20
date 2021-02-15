@@ -15,6 +15,25 @@
         + High performance of forwarding utilizing hardware switches
         + Reducing the complexity of implementing control logic: Distribution transparency
     +  SDN in a Nutshell: SDN is a paradigm to program networks at a high-level
+        + Flow-based Forwarding (not only certain layer, but bundled layer)
+        + Control Plane and Data Plane Separation
+            + Control plane: defines routes, manages network graph
+            + Data plane: forwarding of packets
+        + Logically Centralized Controller
+            + logically centralized
+                + simplifies implementation of control logic
+                + increase global view
+            + physically distributed
+                + ensures high availability and scalability
+    + Architecture of an SDN System
+        + Switches/Routers
+        + SDN Controller
+            + Implements control plane, southbound interface
+            + has Interfaces with control logic (control “application”) via northbound
+                  interface(s)
+            + Physical distribution is transparent to control logic
+            + No standard way of distribution defined
+        + Control Logic
 # OpenFlow
    - OpenFlow de facto standard for southbound interface
    - Proactively: before the flow starts
@@ -46,10 +65,17 @@
    - Forwarding abstraction
    - Specification abstraction
    - State distribution abstraction
- 
- # Pyretic Platform
+ # Traffic Statistics and Topology Discovery
+ ##  Traffic Statistics
+    - OpenFlow switches implement counters
+    - Controller can query counters
+## Topology Discovery
+    - Switch discovery:  OpenFlow protocol
+    - Host discovery: Address Resolution Protocol (ARP)
+    - Links between switches: Link Layer Discovery Protocol (LLDP)
+ # Pyretic Platform 
    - declarative network programming: defines desired network behavior
-   + Defined behavior to OpenFlow rules at runtime
+   + Pyretic Controller Platform (POX): Defined behavior to OpenFlow rules at runtime
        + Compiler chooses
            + header structure dependency
            + data structure mapping
