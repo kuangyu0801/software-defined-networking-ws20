@@ -43,14 +43,31 @@
    - Reactively: as soon as the flow starts
         + Pro: Saves flow table space
         + Con: Puts load onto controller and control network (big issue for UDP)
-# RESTful API
+# Northbound Interfaces
+## RESTful API
+-Remote access to controller via HTTP
+- Only proactive flow programming
 # Module Interface 
-
+- InternalJava-basedAPI
+- Full power of OpenFlow
+    - Proactive & reactive flow programming
+    - Pushing packets
 # MiniNet
    - Mininet creates realistic virtual networks on a single machine
         + Virtual OpenFlow switches
         + Virtual hosts
         + Virtual network interfaces
+
+   
+# Traffic Statistics and Topology Discovery
+##  Traffic Statistics
+- OpenFlow switches implement counters
+- Controller can query counters
+## Topology Discovery
+- Switch discovery:  OpenFlow protocol
+- Host discovery: Address Resolution Protocol (ARP)
+- Links between switches: Link Layer Discovery Protocol (LLDP)
+
 # Network Programming with OpenFlow: No control plane abstractions
 - Pro
     - Network-wide visibility
@@ -62,19 +79,12 @@
     - Explicit resource control
     - Challenging distributed programming
     
- # Desired Abstractions: Behavior
+ ## Desired Abstractions: Behavior
    - Forwarding abstraction
    - Specification abstraction
    - State distribution abstraction
- # Traffic Statistics and Topology Discovery
- ##  Traffic Statistics
-    - OpenFlow switches implement counters
-    - Controller can query counters
-## Topology Discovery
-    - Switch discovery:  OpenFlow protocol
-    - Host discovery: Address Resolution Protocol (ARP)
-    - Links between switches: Link Layer Discovery Protocol (LLDP)
- # Pyretic Platform 
+
+ ## Pyretic Platform 
    - declarative network programming: defines desired network behavior
    + Pyretic Controller Platform (POX): Defined behavior to OpenFlow rules at runtime
        + Compiler chooses
