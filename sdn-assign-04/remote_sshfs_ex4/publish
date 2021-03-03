@@ -1,0 +1,46 @@
+#!/usr/bin/python2
+
+import argparse
+import socket
+import sys
+import subprocess
+import os
+
+filename = os.path.dirname(__file__) + "/measurements.csv"
+n_lines = int(subprocess.check_output(['wc','-l',filename]).split()[0])
+n_steps = 48
+n_linestep = n_lines/n_steps
+
+# parse commandline
+parser = argparse.ArgumentParser(description='Send UDP datagram for each line in "%s", to IP "230.t.v.v" (with 1-bit type flag "t" and 16-bit integer value "v") on port 50000'%(filename,))
+parser.add_argument('-l', '--local', action='store_true', help='send to localhost (no content-based routing)')
+args = parser.parse_args()
+dest = {
+	True: lambda type, value: 'localhost',
+	False: lambda type, value: '230.%s.%d.%d' % ((type,) + divmod(value,256))
+}[args.local]
+
+# create socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+
+print "Publishing %d measurements from %s" % (n_lines,filename)
+try:
+	with open(filename, 'r') as f:
+		l = 0
+		print "[" + "-"*n_steps + "]",
+		sys.stdout.flush()
+		for line in f:
+			l += 1
+			if l % n_linestep == 0:
+				print "\r[" + "#"*(l/n_linestep) + "-"*(n_steps-l/n_linestep) + "]",
+				sys.stdout.flush()
+			# row format: [id],[time],[value],[type],[id_plug],[id_household],[id_house]
+			row = line.split(',')
+			type = row[3]
+			value = int(row[2])
+			sock.sendto( line.strip(), (dest(type,value),50000) )
+		print "done"
+except KeyboardInterrupt:
+	print "\naborted"
+finally:
+	sock.close()
